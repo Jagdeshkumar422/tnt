@@ -1,0 +1,6 @@
+[
+    { "name": "United Kingdom", "dial_code": "+44", "code": "GB" },
+    { "name": "Pakistan", "dial_code": "+92", "code": "PK" },
+    { "name": "United States", "dial_code": "+1", "code": "US" }
+]
+  
