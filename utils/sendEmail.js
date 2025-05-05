@@ -4,8 +4,8 @@ exports.sendOTP = async (email, code) => {
   let transporter = nodemailer.createTransport({
     service: 'Gmail',
     auth: {
-      user: 'jagdeshk953@gmail.com',
-      pass: 'ghgv vdud qlee pcdr'
+      user: 'treasusrexnft@gmail.com',
+      pass: 'yucz gkfw cmyv scpm'
     }
   });
 
