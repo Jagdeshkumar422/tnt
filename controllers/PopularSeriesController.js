@@ -2,7 +2,7 @@ const HighestBid = require("../models/PopularSeries");
 
 exports.getPopular = async (req, res) => {
   try {
-    const cards = await HighestBid.find();
+    const cards = await HighestBid.find().limit(5);
     res.json(cards);
   } catch (err) {
     res.status(500).json({ error: "Server error" });
