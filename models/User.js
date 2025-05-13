@@ -1,6 +1,14 @@
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 
+const depositSchema = new mongoose.Schema({
+  txHash: { type: String, required: true },
+  amount: { type: Number, required: true },
+  network: { type: String, enum: ['BEP20', 'TRC20'], required: true },
+  confirmed: { type: Boolean, default: false },
+  timestamp: { type: Date, default: Date.now },
+});
+
 const userSchema = new mongoose.Schema({
   username: {
     type: String,
@@ -18,7 +26,7 @@ const userSchema = new mongoose.Schema({
   password: {
     type: String,
     required: true,
-    minlength: 6, // Optional: enforce password strength
+    minlength: 6,
   },
   phone: {
     type: String,
@@ -30,14 +38,27 @@ const userSchema = new mongoose.Schema({
   },
   invitation: {
     type: String,
-  }
+  },
+
+  // ✅ New fields for deposit tracking
+  walletAddress: {
+    type: String,
+    required: false, // Set to true if you assign unique addresses per user
+    unique: true,
+    sparse: true
+  },
+  balance: {
+    type: Number,
+    default: 0
+  },
+  deposits: [depositSchema]
 }, {
-  timestamps: true // Adds createdAt and updatedAt fields
+  timestamps: true
 });
 
 // Hash password before saving
 userSchema.pre('save', async function (next) {
-  if (!this.isModified('password')) return next(); // Only hash if password is new/modified
+  if (!this.isModified('password')) return next();
   try {
     const salt = await bcrypt.genSalt(10);
     this.password = await bcrypt.hash(this.password, salt);
@@ -47,7 +68,7 @@ userSchema.pre('save', async function (next) {
   }
 });
 
-// Optional: compare password method for cleaner login logic
+// Compare password method
 userSchema.methods.comparePassword = function (candidatePassword) {
   return bcrypt.compare(candidatePassword, this.password);
 };
