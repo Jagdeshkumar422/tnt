@@ -26,6 +26,17 @@ const { Wallet } = require('ethers');
 //     console.log('Generated Mnemonic:', mnemonic);
     
 // })
+// const checkDeposits = require('./services/depositWatcher');
+
+// setInterval(async () => {
+//   try {
+//     console.log("🔄 Checking for new deposits...");
+//     await checkDeposits();
+//   } catch (error) {
+//     console.error("❌ Error checking deposits:", error);
+//   }
+// }, 60 * 1000);
+
 app.use(cors());
 app.use(express.json());
 app.use('/api', authRoutes);

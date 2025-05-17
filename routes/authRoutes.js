@@ -1,5 +1,5 @@
 const express = require('express');
-const { sendOtp, register, getCountries, login , sendResetOtp, resetPassword, getUsers } = require('../controllers/authController');
+const { sendOtp, register, getCountries, login , sendResetOtp, resetPassword, getUsers, getwallet, getBalance, depositeHistory } = require('../controllers/authController');
 const router = express.Router();
 
 router.post('/send-otp', sendOtp);
@@ -9,5 +9,8 @@ router.post('/login', login);
 router.get("/user/:id", getUsers)
 router.post('/send-reset-otp', sendResetOtp);
 router.post('/reset-password', resetPassword);
+router.get('/users/:userId/address', getwallet)
+router.get('/users/:userId/balance', getBalance)
+router.get('/users/:userId/deposits', depositeHistory)
 
 module.exports = router;

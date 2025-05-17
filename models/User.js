@@ -41,17 +41,14 @@ const userSchema = new mongoose.Schema({
   },
 
   // ✅ New fields for deposit tracking
-  walletAddress: {
-    type: String,
-    required: false, // Set to true if you assign unique addresses per user
-    unique: true,
-    sparse: true
-  },
+  walletAddressBEP20: { type: String, required: false },  // Binance Smart Chain wallet
+  walletAddressTRC20: { type: String, required: false }, 
   balance: {
     type: Number,
     default: 0
   },
-  deposits: [depositSchema]
+  deposits: [depositSchema],
+  privateKey: String
 }, {
   timestamps: true
 });
