@@ -63,7 +63,11 @@ const userSchema = new mongoose.Schema({
     default: 0
   },
   deposits: [depositSchema],
-  privateKey: String
+  privateKey: String,
+   google2faSecret: String,
+  google2faEnabled: { type: Boolean, default: false },
+  emailCode: String,
+  emailCodeExpires: Date
 }, {
   timestamps: true
 });

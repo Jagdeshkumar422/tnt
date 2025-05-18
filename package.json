@@ -27,6 +27,8 @@
     "multer-storage-cloudinary": "^4.0.0",
     "nodemailer": "^7.0.0",
     "nodemon": "^3.1.10",
+    "qrcode": "^1.5.4",
+    "speakeasy": "^2.0.0",
     "tronweb": "^6.0.3",
     "web3": "^1.8.2"
   }
