@@ -36,9 +36,24 @@ const userSchema = new mongoose.Schema({
     type: String,
     required: false,
   },
-  invitation: {
+   invitation: {
     type: String,
+    required: true,
   },
+
+  // Unique invitation code generated for this user
+  invitationCode: {
+    type: String,
+    required: true,
+    unique: true,
+  },
+
+  invitedUsers: [
+    {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+    }
+  ],
 
   // ✅ New fields for deposit tracking
   walletAddressBEP20: { type: String, required: false },  // Binance Smart Chain wallet

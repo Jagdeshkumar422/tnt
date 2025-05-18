@@ -14,8 +14,8 @@ const depositRoutes = require("./routes/depositeRoute")
 
 const app = express();
 connectDB();
-const monitorDeposits = require('./services/monitorBSC');
-setInterval(monitorDeposits, 30000);
+// const monitorDeposits = require('./services/monitorBSC');
+// setInterval(monitorDeposits, 30000);
 
 const { Wallet } = require('ethers');
 

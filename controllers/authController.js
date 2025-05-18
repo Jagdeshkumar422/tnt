@@ -6,6 +6,8 @@ const Transaction = require("../models/Transaction");
 const { Wallet } = require('ethers');
 const mongoose = require('mongoose');
 require('dotenv').config();
+const {generateWallets} = require("../utils/generateWallet")
+const crypto = require('crypto');
 
 const TronWeb = require('tronweb').default.TronWeb;
 const tronWeb = new TronWeb({ fullHost: 'https://api.shasta.trongrid.io' });
@@ -13,24 +15,39 @@ const tronWeb = new TronWeb({ fullHost: 'https://api.shasta.trongrid.io' });
 
 
 
-let otpStore = {}; // Temporary memory storage for OTP
+const INITIAL_INVITE_CODE = 'TreasurNFTX';
 
 // ====================
 // 🔐 OTP & Registration
 // ====================
 
+const otpStore = {}; // In-memory store (move to Redis or DB for production)
+
 exports.sendOtp = async (req, res) => {
   const { email } = req.body;
   const otp = Math.floor(100000 + Math.random() * 900000);
-  otpStore[email] = otp;
+  const expiresAt = Date.now() + 90000; // 90 seconds in milliseconds
+
+  otpStore[email] = { otp, expiresAt };
   await sendOTP(email, otp);
   res.json({ message: 'OTP sent' });
 };
 
-exports.register = async (req, res) => {
-  const { username, email, password, phone, code, countryCode } = req.body;
 
-  if (!otpStore[email] || otpStore[email] !== parseInt(code)) {
+exports.register = async (req, res) => {
+  const { username, email, password, phone, code, countryCode, invitation } = req.body;
+
+  const otpEntry = otpStore[email];
+
+  if (!invitation) {
+    return res.status(400).json({ message: 'Invitation code is required.' });
+  }
+
+  if (
+    !otpEntry ||
+    otpEntry.otp !== parseInt(code) ||
+    Date.now() > otpEntry.expiresAt
+  ) {
     return res.status(400).json({ message: 'Invalid or expired OTP' });
   }
 
@@ -38,46 +55,74 @@ exports.register = async (req, res) => {
     const existing = await User.findOne({ email });
     if (existing) return res.status(400).json({ message: 'Email already registered' });
 
-    // ✅ Generate BEP20 Wallet (Ethereum-based)
-    const bep20Wallet = Wallet.createRandom();
-    const walletAddressBEP20 = bep20Wallet.address;
-    const privateKeyBEP20 = bep20Wallet.privateKey;
+    const totalUsers = await User.countDocuments();
 
-    // ✅ Generate TRC20 Wallet (Tron-based)
-    const tronAccount = await tronWeb.createAccount();
-    const walletAddressTRC20 = tronAccount.address.base58;
-    const privateKeyTRC20 = tronAccount.privateKey;
+    let inviterUser = null;
+    if (totalUsers > 0) {
+      // Find inviter by invitationCode
+      inviterUser = await User.findOne({ invitationCode: invitation });
+      if (!inviterUser) {
+        return res.status(400).json({ message: 'Invalid invitation code' });
+      }
+    } else {
+      // First user (no inviter) - you can set a default admin invitation code or skip check
+      // For example:
+      if (invitation !== 'TREASURENFTX') {
+        return res.status(400).json({ message: 'Invalid invitation code for first user' });
+      }
+    }
 
-    // ✅ Hash password
-    // const hashedPassword = await bcrypt.hash(password, 10);
+    // Generate unique invitationCode for the new user
+    let newInvitationCode;
+    do {
+      newInvitationCode = crypto.randomBytes(4).toString('hex'); // 8 char hex code
+    } while (await User.findOne({ invitationCode: newInvitationCode }));
 
-    // ✅ Save user to DB
-    const user = new User({
-      username,
-      email,
-      password: password,
-      phone,
-      countryCode,
+    const {
       walletAddressBEP20,
       walletAddressTRC20,
       privateKeyBEP20,
-      privateKeyTRC20,
+      privateKeyTRC20
+    } = generateWallets();
+
+    const user = new User({
+      username,
+      email,
+      password,
+      phone,
+      countryCode,
+      invitation,       // inviter's invitationCode
+      invitationCode: newInvitationCode,  // unique code for this user
+      walletAddressBEP20,
+      walletAddressTRC20,
+      privateKey: `${privateKeyBEP20}||${privateKeyTRC20}`
     });
 
     await user.save();
+
+    // Update inviter's invitedUsers list
+    if (inviterUser) {
+      inviterUser.invitedUsers = inviterUser.invitedUsers || [];
+      inviterUser.invitedUsers.push(user._id);
+      await inviterUser.save();
+    }
+
     delete otpStore[email];
 
     res.status(201).json({
       message: 'User registered successfully',
       walletAddressBEP20,
       walletAddressTRC20,
+      invitationCode: newInvitationCode,
     });
 
   } catch (err) {
     console.error('Registration error:', err);
     res.status(500).json({ message: 'Error registering user', error: err.message });
   }
-};
+}
+
+
 
 exports.getCountries = (req, res) => {
   const countries = require('../data/countryCodes.json');
