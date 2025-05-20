@@ -1,5 +1,5 @@
 const express = require('express');
-const { sendOtp, register, getCountries, login , sendResetOtp, resetPassword, getUsers, getwallet, getBalance, depositeHistory } = require('../controllers/authController');
+const { sendOtp, register, getCountries, login , sendResetOtp, resetPassword, getUsers, getwallet, getBalance, depositeHistory, updateUser, changePasswordSendCode, changePassword } = require('../controllers/authController');
 const { googleAuthenticator, confirm2FABinding, getgoogleSecretkey, sendEmailCode } = require('../controllers/googleVerificationController');
 const auth = require('../middleware/auth');
 const router = express.Router();
@@ -9,8 +9,11 @@ router.post('/register', register);
 router.get('/countries', getCountries);
 router.post('/login', login);
 router.get("/user/:id", getUsers)
+router.put("/user/update", updateUser)
 router.post('/send-reset-otp', sendResetOtp);
+router.post('/send-reset-code', changePasswordSendCode);
 router.post('/reset-password', resetPassword);
+router.post('/change-password', changePassword);
 router.get('/users/:userId/address', getwallet)
 router.get('/users/:userId/balance', getBalance)
 router.get('/users/:userId/deposits', depositeHistory)

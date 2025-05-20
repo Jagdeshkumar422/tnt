@@ -8,7 +8,7 @@ const mongoose = require('mongoose');
 require('dotenv').config();
 const {generateWallets} = require("../utils/generateWallet")
 const crypto = require('crypto');
-
+const nodemailer = require("nodemailer")
 const TronWeb = require('tronweb').default.TronWeb;
 const tronWeb = new TronWeb({ fullHost: 'https://api.shasta.trongrid.io' });
 
@@ -32,6 +32,7 @@ exports.sendOtp = async (req, res) => {
   await sendOTP(email, otp);
   res.json({ message: 'OTP sent' });
 };
+
 
 
 exports.register = async (req, res) => {
@@ -59,14 +60,11 @@ exports.register = async (req, res) => {
 
     let inviterUser = null;
     if (totalUsers > 0) {
-      // Find inviter by invitationCode
       inviterUser = await User.findOne({ invitationCode: invitation });
       if (!inviterUser) {
         return res.status(400).json({ message: 'Invalid invitation code' });
       }
     } else {
-      // First user (no inviter) - you can set a default admin invitation code or skip check
-      // For example:
       if (invitation !== 'TREASURENFTX') {
         return res.status(400).json({ message: 'Invalid invitation code for first user' });
       }
@@ -75,7 +73,7 @@ exports.register = async (req, res) => {
     // Generate unique invitationCode for the new user
     let newInvitationCode;
     do {
-      newInvitationCode = crypto.randomBytes(4).toString('hex'); // 8 char hex code
+      newInvitationCode = crypto.randomBytes(4).toString('hex');
     } while (await User.findOne({ invitationCode: newInvitationCode }));
 
     const {
@@ -91,20 +89,40 @@ exports.register = async (req, res) => {
       password,
       phone,
       countryCode,
-      invitation,       // inviter's invitationCode
-      invitationCode: newInvitationCode,  // unique code for this user
+      invitation,
+      invitationCode: newInvitationCode,
       walletAddressBEP20,
       walletAddressTRC20,
       privateKey: `${privateKeyBEP20}||${privateKeyTRC20}`
     });
 
-    await user.save();
-
-    // Update inviter's invitedUsers list
+    // Setup referral chain if not first user
     if (inviterUser) {
-      inviterUser.invitedUsers = inviterUser.invitedUsers || [];
-      inviterUser.invitedUsers.push(user._id);
+      user.referredBy = inviterUser._id;
+
+      // Save user first to generate _id for referrals
+      await user.save();
+
+      // Team A: inviter adds this user
+      inviterUser.teamA.push(user._id);
       await inviterUser.save();
+
+      // Team B: inviter's inviter adds this user
+      const level2 = await User.findById(inviterUser.referredBy);
+      if (level2) {
+        level2.teamB.push(user._id);
+        await level2.save();
+
+        // Team C: inviter's inviter's inviter adds this user
+        const level3 = await User.findById(level2.referredBy);
+        if (level3) {
+          level3.teamC.push(user._id);
+          await level3.save();
+        }
+      }
+    } else {
+      // First user, save after wallet generation
+      await user.save();
     }
 
     delete otpStore[email];
@@ -120,7 +138,7 @@ exports.register = async (req, res) => {
     console.error('Registration error:', err);
     res.status(500).json({ message: 'Error registering user', error: err.message });
   }
-}
+};
 
 
 
@@ -270,5 +288,104 @@ exports.getUsers = async (req, res) => {
   } catch (error) {
     console.error('Error fetching user:', error);
     res.status(500).json({ message: 'Server error' });
+  }
+};
+
+exports.updateUser = async (req, res) => {
+  try {
+    const {
+      phone,
+      countryCode,
+      email,
+      nationality,
+      gender,
+      birthday,
+      countryFlag
+    } = req.body;
+
+    // Assume user is identified by email (or token in real case)
+    const user = await User.findOne({ email });
+
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    // Update fields
+    user.phone = phone || user.phone;
+    user.countryCode = countryCode || user.countryCode;
+    user.nationality = nationality || user.nationality;
+    user.gender = gender || user.gender;
+    user.birthday = birthday || user.birthday;
+
+    await user.save();
+
+    res.json({ message: 'User updated successfully', user });
+  } catch (error) {
+    console.error('Update error:', error);
+    res.status(500).json({ message: 'Server error while updating user' });
+  }
+}
+
+
+const verificationCodes = {}; // In-memory temporary store
+
+// Send verification code to email
+exports.changePasswordSendCode = async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    if (!email) {
+      return res.status(400).json({ message: 'Email is required' });
+    }
+
+    const generatedCode = Math.floor(100000 + Math.random() * 900000); // 6-digit code
+    verificationCodes[email] = generatedCode;
+
+    const transporter = nodemailer.createTransport({
+      service: 'Gmail',
+      auth: {
+        user: 'treasusrexnft@gmail.com',
+        pass: 'yucz gkfw cmyv scpm' // Replace with secure app password
+      },
+    });
+
+    await transporter.sendMail({
+      to: email,
+      subject: 'Password Reset Code',
+      text: `Your password reset code is: ${generatedCode}`,
+    });
+
+    res.status(200).json({ message: 'Verification code sent' });
+
+  } catch (error) {
+    console.error('Error sending code:', error);
+    res.status(500).json({ message: 'Failed to send verification code' });
+  }
+};
+
+// Reset password using verification code
+exports.changePassword = async (req, res) => {
+  try {
+    const { email, code, newPassword } = req.body;
+
+    if (!email || !code || !newPassword) {
+      return res.status(400).json({ message: 'Missing required fields' });
+    }
+
+    const storedCode = verificationCodes[email];
+    if (!storedCode || Number(code) !== storedCode) {
+      return res.status(400).json({ message: 'Invalid or expired code' });
+    }
+
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    await User.findOneAndUpdate({ email }, { password: hashedPassword });
+
+    delete verificationCodes[email];
+
+    res.status(200).json({ message: 'Password has been reset successfully' });
+
+  } catch (error) {
+    console.error('Error resetting password:', error);
+    res.status(500).json({ message: 'Failed to reset password' });
   }
 };

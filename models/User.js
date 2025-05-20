@@ -40,13 +40,14 @@ const userSchema = new mongoose.Schema({
     type: String,
     required: true,
   },
-
+  nationality: String,
   // Unique invitation code generated for this user
   invitationCode: {
     type: String,
     required: true,
     unique: true,
   },
+  birthday: String,
 
   invitedUsers: [
     {
@@ -67,7 +68,15 @@ const userSchema = new mongoose.Schema({
    google2faSecret: String,
   google2faEnabled: { type: Boolean, default: false },
   emailCode: String,
-  emailCodeExpires: Date
+  emailCodeExpires: Date,
+  referredBy: {
+  type: mongoose.Schema.Types.ObjectId,
+  ref: 'User',
+},
+
+teamA: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }], // Direct invites
+teamB: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }], // Team A’s invites
+teamC: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }], // Team B’s invites
 }, {
   timestamps: true
 });

@@ -8,6 +8,7 @@ const PopularSeriesRoutes = require('./routes/popularSeriesRoute');
 const StakeAreaRoute = require('./routes/StakeAreaRoute');
 const StakeFreeZoneRoute = require('./routes/StakeFreeZoneRoute');
 const ReservationRoute = require('./routes/reservationRoute');
+const WithdrwalRoutes = require('./routes/withdrawal');
 
 require("dotenv").config();
 const depositRoutes = require("./routes/depositeRoute")
@@ -46,6 +47,7 @@ app.use('/api', PopularSeriesRoutes);
 app.use('/api', StakeAreaRoute);
 app.use('/api', StakeFreeZoneRoute);
 app.use('/api', ReservationRoute);
+app.use('/api', WithdrwalRoutes);
 app.use('/api/deposits', depositRoutes);
 
 const PORT = process.env.PORT || 5000;
