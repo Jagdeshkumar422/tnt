@@ -73,6 +73,7 @@ const userSchema = new mongoose.Schema({
   type: mongoose.Schema.Types.ObjectId,
   ref: 'User',
 },
+level: { type: Number, default: 0 },
 
 teamA: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }], // Direct invites
 teamB: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }], // Team A’s invites

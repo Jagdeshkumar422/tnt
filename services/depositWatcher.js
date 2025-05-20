@@ -9,13 +9,12 @@ async function initializeTronWeb() {
     console.log("TronWeb initialized successfully.");
   } catch (error) {
     console.error("Failed to initialize TronWeb:", error);
-    // IMPORTANT: Handle this error.  The rest of your code depends on TronWeb.
-    //  You might want to throw an error, exit the process, or use a fallback.
-    process.exit(1); // Exit, because the app cannot run without TronWeb
+    process.exit(1); 
   }
 }
 const User = require("../models/User");
 const Transaction = require("../models/Transaction");
+const { updateUserLevel } = require("../utils/updateUserLevel");
 
 const provider = new ethers.JsonRpcProvider("https://data-seed-prebsc-1-s1.binance.org:8545/");
 const USDT_ADDRESS_BEP20 = "0x55d398326f99059fF775485246999027B3197955"; // BEP20 USDT
@@ -133,6 +132,7 @@ async function checkBEP20Deposits() {
           network: 'BEP20',
           timestamp: new Date()
         });
+        await updateUserLevel(user);
 
         console.log(`✅ [BEP20] New deposit: ${amount} USDT from ${from} to ${to}`);
       }
