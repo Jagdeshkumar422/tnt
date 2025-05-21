@@ -9,6 +9,7 @@ const StakeAreaRoute = require('./routes/StakeAreaRoute');
 const StakeFreeZoneRoute = require('./routes/StakeFreeZoneRoute');
 const ReservationRoute = require('./routes/reservationRoute');
 const WithdrwalRoutes = require('./routes/withdrawal');
+const bannerRoutes = require('./routes/bannerRoutes');
 
 require("dotenv").config();
 const depositRoutes = require("./routes/depositeRoute")
@@ -49,6 +50,7 @@ app.use('/api', StakeFreeZoneRoute);
 app.use('/api', ReservationRoute);
 app.use('/api', WithdrwalRoutes);
 app.use('/api/deposits', depositRoutes);
+app.use("/api", bannerRoutes);
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
