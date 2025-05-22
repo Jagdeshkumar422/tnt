@@ -120,22 +120,43 @@ async function checkBEP20Deposits() {
       const user = users.find(u => u.walletAddressBEP20 && u.walletAddressBEP20.toLowerCase() === to);
       if (!user) continue;
 
-      const exists = await Transaction.findOne({ txHash });
-      if (!exists) {
-        await Transaction.create({
-          txHash,
-          from,
-          to,
-          amount,
-          status: 'confirmed',
-          user: user._id,
-          network: 'BEP20',
-          timestamp: new Date()
-        });
-        await updateUserLevel(user);
+     const exists = await Transaction.findOne({ txHash });
+if (!exists) {
+  await Transaction.create({
+    txHash,
+    from,
+    to,
+    amount,
+    status: 'confirmed',
+    user: user._id,
+    network: 'BEP20', // or TRC20
+    timestamp: new Date()
+  });
 
-        console.log(`✅ [BEP20] New deposit: ${amount} USDT from ${from} to ${to}`);
-      }
+  // 💰 1. First-time deposit logic
+  const previousDeposits = await Transaction.find({ user: user._id });
+  if (previousDeposits.length === 0) {
+    const bonus = parseFloat((amount * 0.07).toFixed(2));
+    user.balance += bonus;
+    user.level = 1; // 🔁 Set user level to Level 1
+    await user.save();
+    console.log(`🎁 First deposit bonus: ${bonus} USDT credited to user ${user.username || user._id}`);
+  }
+
+  // 💸 2. Referral bonus logic
+  if (user.referredBy) {
+    const referrer = await User.findById(user.referredBy);
+    if (referrer) {
+      const referralBonus = parseFloat((amount * 0.10).toFixed(2));
+      referrer.balance += referralBonus;
+      await referrer.save();
+      console.log(`🎉 Referral bonus: ${referralBonus} USDT credited to ${referrer.username || referrer._id} from referral ${user._id}`);
+    }
+  }
+
+  console.log(`✅ [Deposit] ${amount} USDT from ${from} to ${to}`);
+}
+
     }
 
     lastScannedBlockBEP20 = currentBlock;

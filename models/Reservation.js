@@ -6,8 +6,13 @@ const reservationSchema = new mongoose.Schema({
     ref: "User", // assumes a User model exists
     required: true,
   },
-  nftName: {
-    type: String,
+  // nftName: {
+  //   type: String,
+  //   required: true,
+  // },
+   nftId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "NFT", // assumes an Nft model exists
     required: true,
   },
   status: {

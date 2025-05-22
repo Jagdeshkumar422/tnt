@@ -2,12 +2,12 @@ const mongoose = require('mongoose');
 
 const depositSchema = new mongoose.Schema({
   userId: String,
-  address: String,
+  paymentId: String,
   amount: Number,
   currency: String,
-  txId: String,
-  network: String,
+  address: String,
   status: String,
-}, { timestamps: true });
+  timestamp: Date,
+});
 
 module.exports = mongoose.model('Deposit', depositSchema);
