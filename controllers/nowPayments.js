@@ -40,8 +40,8 @@ const createNowPaymentInvoice = async (req, res) => {
       order_id: `deposit_${userId}_${Date.now()}`,
       order_description: `Deposit for user ${userId}`,
       ipn_callback_url: `https://tnt-hhh6.vercel.app/payments/webhook`,
-      success_url: `${process.env.FRONTEND_URL}/recharge/success`,
-      cancel_url: `${process.env.FRONTEND_URL}/recharge/cancel`,
+      success_url: `https://treasurenftx.xyz/recharge/success`,
+      cancel_url: `https://treasurenftx.xyz/recharge/cancel`,
     });
 
     const invoiceResponse = await axios.post(
@@ -53,8 +53,8 @@ const createNowPaymentInvoice = async (req, res) => {
         order_id: `deposit_${userId}_${Date.now()}`,
         order_description: `Deposit for user ${userId}`,
         ipn_callback_url: `https://tnt-hhh6.vercel.app/payments/webhook`,
-        success_url: `${process.env.FRONTEND_URL}/recharge/success`,
-        cancel_url: `${process.env.FRONTEND_URL}/recharge/cancel`,
+        success_url: `https://treasurenftx.xyz/recharge/success`,
+        cancel_url: `https://treasurenftx.xyz/recharge/cancel`,
       },
       {
         headers: {
