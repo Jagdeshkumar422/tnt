@@ -59,6 +59,7 @@ const userSchema = new mongoose.Schema({
   // ✅ New fields for deposit tracking
   walletAddressBEP20: { type: String, required: false },  // Binance Smart Chain wallet
   walletAddressTRC20: { type: String, required: false }, 
+  address: String,
   balance: {
     type: Number,
     default: 0

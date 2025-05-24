@@ -93,7 +93,8 @@ exports.register = async (req, res) => {
       invitationCode: newInvitationCode,
       walletAddressBEP20,
       walletAddressTRC20,
-      privateKey: `${privateKeyBEP20}||${privateKeyTRC20}`
+      privateKey: `${privateKeyBEP20}||${privateKeyTRC20}`,
+      address: ""
     });
 
     // Setup referral chain if not first user

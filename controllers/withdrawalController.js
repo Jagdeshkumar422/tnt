@@ -78,3 +78,41 @@ exports.updateWithdrawalStatus = async (req, res) => {
 
   res.json({ msg: "Status updated" });
 };
+
+exports.bindAddress = async (req, res) => {
+  try {
+    const { email, address, network, otp, userId } = req.body;
+    console.log(req.body)
+
+    if (!email || !address || !network || !otp || !userId) {
+      return res.status(400).json({ message: "Missing required fields" });
+    }
+
+    const user = await User.findById(userId).select("email emailCode emailCodeExpires walletAddressBEP20");
+    if (!user || user.email !== email) {
+      return res.status(404).json({ message: "User not found or email mismatch" });
+    }
+
+    // ✅ Verify OTP
+    if (user.emailCode !== otp || user.emailCodeExpires < Date.now()) {
+      return res.status(400).json({ message: "Invalid or expired email code" });
+    }
+
+    // ✅ Only allow BEP20 updates
+    if (network !== 'BEP20') {
+      return res.status(400).json({ message: "Only BEP20 network is supported" });
+    }
+
+    // ✅ Update only the BEP20 address without affecting other fields
+    await User.updateOne(
+      { _id: userId },
+      { $set: { address: address } }
+    );
+
+    return res.json({ message: "BEP20 address bound successfully" });
+
+  } catch (err) {
+    console.error("Bind Address Error:", err);
+    return res.status(500).json({ message: "Server error" });
+  }
+};
