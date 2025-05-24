@@ -39,7 +39,7 @@ const createNowPaymentInvoice = async (req, res) => {
       pay_currency: payCurrency,
       order_id: `deposit_${userId}_${Date.now()}`,
       order_description: `Deposit for user ${userId}`,
-      ipn_callback_url: `${process.env.BACKEND_URL}/payments/webhook`,
+      ipn_callback_url: `https://tnt-hhh6.vercel.app/payments/webhook`,
       success_url: `${process.env.FRONTEND_URL}/recharge/success`,
       cancel_url: `${process.env.FRONTEND_URL}/recharge/cancel`,
     });
@@ -52,7 +52,7 @@ const createNowPaymentInvoice = async (req, res) => {
         pay_currency: payCurrency,
         order_id: `deposit_${userId}_${Date.now()}`,
         order_description: `Deposit for user ${userId}`,
-        ipn_callback_url: `${process.env.BACKEND_URL}/payments/webhook`,
+        ipn_callback_url: `https://tnt-hhh6.vercel.app/payments/webhook`,
         success_url: `${process.env.FRONTEND_URL}/recharge/success`,
         cancel_url: `${process.env.FRONTEND_URL}/recharge/cancel`,
       },
