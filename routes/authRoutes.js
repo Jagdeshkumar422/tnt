@@ -20,8 +20,8 @@ router.get('/users/:userId/balance', getBalance)
 router.get('/users/:userId/deposits', depositeHistory)
 // routes/auth.js
 router.post('/send-email-code', sendEmailCode);
-router.get("/google-secret",auth, getgoogleSecretkey)
 router.post('/verify-2fa',auth, googleAuthenticator);
+router.get('/google-secret',auth, getgoogleSecretkey);
 router.get('/community-stats', getCommunityStats);
 
 module.exports = router;
