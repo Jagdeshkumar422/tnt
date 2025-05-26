@@ -71,10 +71,20 @@ exports.register = async (req, res) => {
     }
 
     // Generate unique invitationCode for the new user
-    let newInvitationCode;
-    do {
-      newInvitationCode = crypto.randomBytes(4).toString('hex');
-    } while (await User.findOne({ invitationCode: newInvitationCode }));
+   function generateInvitationCode(length = 6) {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+  let code = '';
+  for (let i = 0; i < length; i++) {
+    code += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return code;
+}
+
+// Usage in your async context
+let newInvitationCode;
+do {
+  newInvitationCode = generateInvitationCode();
+} while (await User.findOne({ invitationCode: newInvitationCode }));;
 
     const {
       walletAddressBEP20,
@@ -390,3 +400,116 @@ exports.changePassword = async (req, res) => {
     res.status(500).json({ message: 'Failed to reset password' });
   }
 };
+
+exports.getTodayTeamRevenue = async (req, res) => {
+  const userId = req.params.userId;
+  const todayStart = new Date();
+  todayStart.setHours(0, 0, 0, 0);
+
+  try {
+    const user = await User.findById(userId); // populate if referrals are in a separate model
+
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const todayRevenue = user.teamRevenueHistory
+      ?.filter(entry => new Date(entry.createdAt) >= todayStart)
+      ?.reduce((sum, entry) => sum + entry.amount, 0) || 0;
+
+    const totalCommunityRewards = user.teamRevenueHistory
+      ?.reduce((sum, entry) => sum + entry.amount, 0) || 0;
+
+    const validInvitations = user.referrals?.filter(r => r.isActive)?.length || 0;
+    const levelA = user.referrals?.length || 0;
+    const levelB = user.referrals
+      ?.flatMap(r => r.referrals || [])?.length || 0;
+    const levelC = user.referrals
+      ?.flatMap(r => r.referrals || [])
+      ?.flatMap(r => r.referrals || []).length || 0;
+
+    // 👉 Add level-wise revenue split
+    const levelARevenue = user.teamRevenueHistory
+      ?.filter(e => e.level === 'A')
+      ?.reduce((sum, e) => sum + e.amount, 0) || 0;
+
+    const levelBRevenue = user.teamRevenueHistory
+      ?.filter(e => e.level === 'B')
+      ?.reduce((sum, e) => sum + e.amount, 0) || 0;
+
+    const levelCRevenue = user.teamRevenueHistory
+      ?.filter(e => e.level === 'C')
+      ?.reduce((sum, e) => sum + e.amount, 0) || 0;
+
+    res.status(200).json({
+      todayTeamRevenue: todayRevenue.toFixed(2),
+      totalCommunityRewards: totalCommunityRewards.toFixed(2),
+      validInvitations,
+      levelA,
+      levelBC: levelB + levelC,
+
+      // ✅ New fields:
+      levelARevenue: levelARevenue.toFixed(2),
+      levelBRevenue: levelBRevenue.toFixed(2),
+      levelCRevenue: levelCRevenue.toFixed(2),
+    });
+  } catch (err) {
+    console.error('Error in team revenue stats:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+};
+
+const moment = require('moment');
+
+exports.getCommunityStats = async (req, res) => {
+  const { time } = req.query;
+
+  const timeFilters = {
+    Today: { createdAt: { $gte: moment().startOf('day').toDate() } },
+    Yesterday: {
+      createdAt: {
+        $gte: moment().subtract(1, 'day').startOf('day').toDate(),
+        $lt: moment().startOf('day').toDate(),
+      },
+    },
+    'This week': {
+      createdAt: { $gte: moment().startOf('week').toDate() },
+    },
+    'This month': {
+      createdAt: { $gte: moment().startOf('month').toDate() },
+    },
+    All: {}, // No filter
+  };
+
+  const filter = timeFilters[time] || {};
+
+  try {
+    const allUsers = await User.find(filter);
+
+    const totalRegistered = allUsers.length;
+    const activeUsers = allUsers.filter(u => u.balance > 0).length;
+
+    const levels = { A: { registered: 0, active: 0 }, B: { registered: 0, active: 0 }, C: { registered: 0, active: 0 } };
+
+    allUsers.forEach(user => {
+      if (user.level === 1) levels.A.registered++;
+      if (user.level === 2) levels.B.registered++;
+      if (user.level === 3) levels.C.registered++;
+
+      if (user.balance > 0) {
+        if (user.level === 1) levels.A.active++;
+        if (user.level === 2) levels.B.active++;
+        if (user.level === 3) levels.C.active++;
+      }
+    });
+
+    res.json({
+      totalRegistered,
+      activeUsers,
+      levels
+    });
+  } catch (err) {
+    res.status(500).json({ message: 'Error fetching stats', error: err.message });
+  }
+};
+

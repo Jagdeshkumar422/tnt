@@ -79,6 +79,15 @@ level: { type: Number, default: 0 },
 teamA: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }], // Direct invites
 teamB: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }], // Team A’s invites
 teamC: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }], // Team B’s invites
+teamRevenueHistory: [
+  {
+    amount: { type: Number, required: true },
+    level: { type: String, enum: ['A', 'B', 'C']},
+    createdAt: { type: Date, default: Date.now }
+  }
+]
+
+
 }, {
   timestamps: true
 });
