@@ -30,6 +30,18 @@ router.get('/check-deposits', async (req, res) => {
   }
 });
 
+// GET /api/user-deposits/:userId
+router.get('/user-deposits', async (req, res) => {
+  try {
+    const deposits = await Deposit.find().sort({ createdAt: -1 });
+    res.json(deposits);
+  } catch (err) {
+    console.error(err);
+    res.status(500).send("Error fetching user deposits");
+  }
+});
+
+
 router.get('/user-balance/:userId', async (req, res) => {
   const deposits = await Deposit.find({ userId: req.params.userId, status: "confirmed" });
   const total = deposits.reduce((sum, d) => sum + d.amount, 0);
