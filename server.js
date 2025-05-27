@@ -10,59 +10,40 @@ const StakeFreeZoneRoute = require('./routes/StakeFreeZoneRoute');
 const ReservationRoute = require('./routes/reservationRoute');
 const WithdrwalRoutes = require('./routes/withdrawal');
 const bannerRoutes = require('./routes/bannerRoutes');
-const nowPaymentsRoutes = require("./routes/nowPayment")
-const history = require("./routes/history")
-const Setting = require("./routes/settingsRoute")
+const nowPaymentsRoutes = require('./routes/nowPayment');
+const historyRoutes = require('./routes/history');
+const settingsRoutes = require('./routes/settingsRoute');
+const depositRoutes = require('./routes/depositeRoute');
 
-require("dotenv").config();
-const depositRoutes = require("./routes/depositeRoute")
+require('dotenv').config();
 
 const app = express();
 connectDB();
-// const monitorDeposits = require('./services/monitorBSC');
-// setInterval(monitorDeposits, 30000);
-
-const { Wallet } = require('ethers');
-
-// Generate a new valid mnemonic
-// app.get("/", ()=> {
-//     const wallet = Wallet.createRandom();
-//     const mnemonic = wallet.mnemonic.phrase;
-//     console.log('Generated Mnemonic:', mnemonic);
-    
-// })
-// const checkDeposits = require('./services/depositWatcher');
-
-// setInterval(async () => {
-//   try {
-//     console.log("🔄 Checking for new deposits...");
-//     await checkDeposits();
-//   } catch (error) {
-//     console.error("❌ Error checking deposits:", error);
-//   }
-// }, 60 * 1000);
 
 const allowedOrigins = [
   'https://admin.treasurenftx.xyz',
   'https://treasurenftx.xyz',
   'http://localhost:3000',
-  'http://localhost:3004'
+  'http://localhost:3004',
+  'http://localhost:3005',
 ];
 
+// ✅ CORS middleware
 app.use(cors({
   origin: function (origin, callback) {
-    // Allow requests with no origin (like mobile apps or curl)
-    if (!origin) return callback(null, true);
-    if (allowedOrigins.includes(origin)) {
-      return callback(null, true);
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
     } else {
-      return callback(new Error('Not allowed by CORS'));
+      console.error(`❌ CORS blocked request from: ${origin}`);
+      callback(new Error('Not allowed by CORS'));
     }
   },
   credentials: true
 }));
 
 app.use(express.json());
+
+// ✅ Routes
 app.use('/api', authRoutes);
 app.use('/api', nftRoutes);
 app.use('/api', HighestBidRoutes);
@@ -71,11 +52,19 @@ app.use('/api', StakeAreaRoute);
 app.use('/api', StakeFreeZoneRoute);
 app.use('/api', ReservationRoute);
 app.use('/api', WithdrwalRoutes);
+app.use('/api', bannerRoutes);
+app.use('/api', historyRoutes);
+app.use('/api/settings', settingsRoutes); // ⚠️ This route must not conflict with `/api`
 app.use('/api/deposits', depositRoutes);
-app.use("/api", bannerRoutes);
-app.use("/api", history);
-app.use("/api/settings", Setting);
 app.use('/api/payments', nowPaymentsRoutes);
 
+// ✅ Error handling for CORS
+app.use((err, req, res, next) => {
+  if (err.message === 'Not allowed by CORS') {
+    return res.status(403).json({ error: 'CORS Error: This origin is not allowed.' });
+  }
+  next(err);
+});
+
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
