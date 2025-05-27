@@ -42,7 +42,16 @@ const { Wallet } = require('ethers');
 //   }
 // }, 60 * 1000);
 
-app.use(cors());
+
+app.use(
+  cors({
+    origin: "*",
+    methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"], // Include all standard methods
+    credentials: true, // Allow cookies and credentials
+  })
+);
+
+// app.use(cors());
 app.use(express.json());
 app.use('/api', authRoutes);
 app.use('/api', nftRoutes);
