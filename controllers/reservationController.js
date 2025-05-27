@@ -35,12 +35,17 @@ exports.reserveNft = async (req, res) => {
       return res.status(404).json({ error: "NFT not found" });
     }
 
+    // ✅ Check if user balance is enough for this NFT
+    if (user.balance < nft.price) {
+      return res.status(403).json({ error: `Insufficient balance. NFT price is $${nft.price}, your balance is $${user.balance}.` });
+    }
+
     const reservation = new Reservation({
       userId,
       nftId,
       reservedAt: new Date(),
       status: "reserved",
-      amount: nft.price || 100,  // Assuming amount is the NFT price
+      amount: nft.price || 100,  // Fallback in case nft.price is undefined
     });
 
     await reservation.save();
@@ -51,6 +56,7 @@ exports.reserveNft = async (req, res) => {
     return res.status(500).json({ error: "Failed to reserve NFT" });
   }
 };
+
 
 // Get reserved NFTs for a user
 exports.getReservedNfts = async (req, res) => {
@@ -87,7 +93,7 @@ exports.sellNFT = async (req, res) => {
     }
 
     // Fetch the NFT using nftId from reservation
-    const nft = await NFT.findById(reservation.nftId);
+    const nft = await Nft.findById(reservation.nftId);
     if (!nft) {
       return res.status(404).json({ error: "NFT not found" });
     }
