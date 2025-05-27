@@ -42,7 +42,10 @@ const { Wallet } = require('ethers');
 //   }
 // }, 60 * 1000);
 
-app.use(cors());
+app.use(cors({
+  origin: ['https://admin.treasurenftx.xyz','https://treasurenftx.xyz/','*'],
+  credentials: true
+}));
 app.use(express.json());
 app.use('/api', authRoutes);
 app.use('/api', nftRoutes);
