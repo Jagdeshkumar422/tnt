@@ -1,9 +1,10 @@
 const express = require('express');
-const { sendOtp, register, getCountries, login , sendResetOtp, resetPassword, getUsers, getwallet, getBalance, depositeHistory, updateUser, changePasswordSendCode, changePassword, getTodayTeamRevenue, getCommunityStats } = require('../controllers/authController');
+const { sendOtp, register, getCountries, login , sendResetOtp, resetPassword, getUsers, getwallet, getBalance, depositeHistory, updateUser, changePasswordSendCode, changePassword, getTodayTeamRevenue, getCommunityStats, updateProfilePic } = require('../controllers/authController');
 const { googleAuthenticator, confirm2FABinding, getgoogleSecretkey, sendEmailCode } = require('../controllers/googleVerificationController');
 const auth = require('../middleware/auth');
 const router = express.Router();
 const User = require("../models/User")
+const upload = require("../middlewares/upload")
 
 router.post('/send-otp', sendOtp);
 router.post('/register', register);
@@ -24,6 +25,7 @@ router.post('/send-email-code', sendEmailCode);
 router.post('/verify-2fa',auth, googleAuthenticator);
 router.get('/google-secret',auth, getgoogleSecretkey);
 router.get('/community-stats', getCommunityStats);
+router.post('/update-profile-pic', auth, upload.single('image'), updateProfilePic);
 router.get('/users', async (req, res) => {
   try {
     const users = await User.find().sort({ createdAt: -1 }); // latest first

@@ -16,6 +16,16 @@ const userSchema = new mongoose.Schema({
     unique: true,
     trim: true,
   },
+  userId: {
+  type: String,
+  required: true,
+  unique: true
+},
+
+profilePic: {
+  type: String, // store image URL or path
+  default: "https://res.cloudinary.com/di0qbhv97/image/upload/v1748363707/logo_cdjvvj.png"   // optional default placeholder
+},
   email: {
     type: String,
     required: true,

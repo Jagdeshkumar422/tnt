@@ -30,6 +30,7 @@
     "nodemon": "^3.1.10",
     "qrcode": "^1.5.4",
     "speakeasy": "^2.0.0",
+    "streamifier": "^0.1.1",
     "tronweb": "^6.0.3",
     "web3": "^1.8.2"
   }

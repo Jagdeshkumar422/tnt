@@ -11,6 +11,7 @@ const crypto = require('crypto');
 const nodemailer = require("nodemailer")
 const TronWeb = require('tronweb').default.TronWeb;
 const tronWeb = new TronWeb({ fullHost: 'https://api.shasta.trongrid.io' });
+const cloudinary = require('../config/cloudinary');
 
 
 
@@ -39,6 +40,14 @@ exports.register = async (req, res) => {
   const { username, email, password, phone, code, countryCode, invitation } = req.body;
 
   const otpEntry = otpStore[email];
+  function generateUserId() {
+  return `USER${Math.floor(100000 + Math.random() * 900000)}`;
+}
+
+let newUserId;
+do {
+  newUserId = generateUserId();
+} while (await User.findOne({ userId: newUserId }));
 
   if (!invitation) {
     return res.status(400).json({ message: 'Invitation code is required.' });
@@ -96,6 +105,7 @@ do {
     const user = new User({
       username,
       email,
+      userId: newUserId,
       password,
       phone,
       countryCode,
@@ -150,6 +160,28 @@ do {
     res.status(500).json({ message: 'Error registering user', error: err.message });
   }
 };
+
+const streamifier = require("streamifier");
+
+exports.updateProfilePic = async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ message: "Image file is required" });
+    }
+
+    const imageUrl = req.file.path; // Cloudinary URL provided by multer-storage-cloudinary
+
+    // Update user profile pic URL in DB
+    const userId = req.user._id; // or however you get user id
+    const user = await User.findByIdAndUpdate(userId, { profilePic: imageUrl }, { new: true });
+
+    res.json({ message: "Profile pic updated", user });
+  } catch (error) {
+    console.error("Error uploading profile pic:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
 
 
 
