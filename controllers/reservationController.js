@@ -86,7 +86,13 @@ exports.sellNFT = async (req, res) => {
       return res.status(404).json({ error: "User not found" });
     }
 
-    const amount = reservation.amount || 100;
+    // Fetch the NFT using nftId from reservation
+    const nft = await NFT.findById(reservation.nftId);
+    if (!nft) {
+      return res.status(404).json({ error: "NFT not found" });
+    }
+
+    const nftPrice = nft.price;
     const level = Number(user.level) || 1;
 
     // Determine profit percent based on user level
@@ -97,14 +103,14 @@ exports.sellNFT = async (req, res) => {
     else if (level === 5) profitPercent = 0.036;
     else if (level >= 6) profitPercent = 0.04;
 
-    const profit = parseFloat((amount * profitPercent).toFixed(2));
+    const profit = parseFloat((nftPrice * profitPercent).toFixed(2));
 
     // Add profit to user's balance
     user.balance += profit;
     await user.save();
 
     // Team revenue sharing
-    const teamProfit = amount * profitPercent;
+    const teamProfit = nftPrice * profitPercent;
     const teamRevenue = [
       { ref: user.teamA, percent: 0.15 },
       { ref: user.teamB, percent: 0.07 },
