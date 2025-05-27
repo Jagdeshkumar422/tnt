@@ -80,9 +80,6 @@ exports.sellNFT = async (req, res) => {
     if (!reservation) {
       return res.status(404).json({ error: "Reservation not found" });
     }
-    if (reservation.status === 'sold') {
-      return res.status(400).json({ error: "NFT already sold" });
-    }
 
     const user = await User.findById(reservation.userId);
     if (!user) {
