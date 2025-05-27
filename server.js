@@ -45,7 +45,8 @@ const { Wallet } = require('ethers');
 const allowedOrigins = [
   'https://admin.treasurenftx.xyz',
   'https://treasurenftx.xyz',
-  'http://localhost:3000'
+  'http://localhost:3000',
+  'http://localhost:3004'
 ];
 
 app.use(cors({

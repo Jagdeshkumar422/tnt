@@ -13,15 +13,23 @@ router.post('/update', async (req, res) => {
   const { telegramChannel, telegramHelpLine } = req.body;
 
   let settings = await Settings.findOne();
+
   if (!settings) {
-    settings = new Settings({ telegramChannel, telegramHelpLine });
-  } else {
+    settings = new Settings({});
+  }
+
+  // Update only the fields that are provided
+  if (telegramChannel !== undefined) {
     settings.telegramChannel = telegramChannel;
+  }
+
+  if (telegramHelpLine !== undefined) {
     settings.telegramHelpLine = telegramHelpLine;
   }
 
   await settings.save();
   res.json({ message: 'Settings updated successfully' });
 });
+
 
 module.exports = router;
