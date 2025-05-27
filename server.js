@@ -42,10 +42,25 @@ const { Wallet } = require('ethers');
 //   }
 // }, 60 * 1000);
 
+const allowedOrigins = [
+  'https://admin.treasurenftx.xyz',
+  'https://treasurenftx.xyz',
+  'http://localhost:3000'
+];
+
 app.use(cors({
-  origin: ['https://admin.treasurenftx.xyz','https://treasurenftx.xyz/','*'],
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps or curl)
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    } else {
+      return callback(new Error('Not allowed by CORS'));
+    }
+  },
   credentials: true
 }));
+
 app.use(express.json());
 app.use('/api', authRoutes);
 app.use('/api', nftRoutes);
