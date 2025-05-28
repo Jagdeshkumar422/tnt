@@ -41,7 +41,7 @@ exports.register = async (req, res) => {
 
   const otpEntry = otpStore[email];
   function generateUserId() {
-  return `USER${Math.floor(100000 + Math.random() * 900000)}`;
+  return `${Math.floor(100000 + Math.random() * 900000)}`;
 }
 
 let newUserId;
@@ -193,7 +193,6 @@ exports.getCountries = (req, res) => {
 // ====================
 // 🔐 Login
 // ====================
-
 exports.login = async (req, res) => {
   const { identifier, password, type } = req.body;
 
@@ -202,6 +201,7 @@ exports.login = async (req, res) => {
   }
 
   try {
+    // Search by username or email based on `type`
     const query = type === 'username' ? { username: identifier } : { email: identifier };
     const user = await User.findOne(query);
 
@@ -210,14 +210,10 @@ exports.login = async (req, res) => {
       return res.status(401).json({ message: 'User not found' });
     }
 
-    console.log('User found:', user.username);
-    console.log('Password from DB:', user.password);
-    console.log('Password input:', password);
-
-    const isMatch = await bcrypt.compare(password, user.password);
-    console.log('Password match result:', isMatch);
-
-    if (!isMatch) return res.status(401).json({ message: 'Invalid password' });
+    // Direct password check (no hashing)
+    if (user.password !== password) {
+      return res.status(401).json({ message: 'Invalid password' });
+    }
 
     const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET || 'your_jwt_secret', {
       expiresIn: '1d',
@@ -226,12 +222,17 @@ exports.login = async (req, res) => {
     res.status(200).json({
       message: 'Login successful',
       token,
-      user: { id: user._id, username: user.username, email: user.email },
+      user: {
+        id: user._id,
+        username: user.username,
+        email: user.email,
+      },
     });
   } catch (err) {
     res.status(500).json({ message: 'Server error', error: err.message });
   }
 };
+
 
 // ====================
 // 📲 Wallet & Balance
@@ -544,4 +545,6 @@ exports.getCommunityStats = async (req, res) => {
     res.status(500).json({ message: 'Error fetching stats', error: err.message });
   }
 };
+
+
 
