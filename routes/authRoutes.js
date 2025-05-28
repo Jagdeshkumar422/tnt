@@ -142,4 +142,24 @@ router.delete('/user/:id', async (req, res) => {
   }
 })
 
+router.get('/team-members', auth, async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id)
+      .populate('teamA', 'username email createdAt profilePic level')
+      .populate('teamB', 'username email createdAt profilePic level')
+      .populate('teamC', 'username email createdAt profilePic level');
+
+    if (!user) return res.status(404).json({ message: 'User not found' });
+
+    res.json({
+      teamA: user.teamA,
+      teamB: user.teamB,
+      teamC: user.teamC,
+    });
+  } catch (err) {
+    console.error('Error fetching team members:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
 module.exports = router;

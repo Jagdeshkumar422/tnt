@@ -4,8 +4,8 @@ const Deposit = require('../models/Deposit');
 const WithdrawalRequest = require('../models/WithdrawalRequest');
 const Reservation = require('../models/Reservation');
 const User = require('../models/User');
-
-router.get('/history', async (req, res) => {
+const auth = require("../middleware/auth")
+router.get('/history', auth, async (req, res) => {
   const userId = req.user.id;
 
   try {
