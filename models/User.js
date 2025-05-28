@@ -24,7 +24,7 @@ const userSchema = new mongoose.Schema({
 
 profilePic: {
   type: String, // store image URL or path
-  default: "https://res.cloudinary.com/di0qbhv97/image/upload/v1748363707/logo_cdjvvj.png"   // optional default placeholder
+  default: "https://res.cloudinary.com/di0qbhv97/image/upload/v1748410875/WhatsApp_Image_2025-05-27_at_19.28.18_cdcc6b41_yosb9z.jpg"   // optional default placeholder
 },
   email: {
     type: String,

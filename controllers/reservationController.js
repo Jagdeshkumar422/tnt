@@ -87,12 +87,16 @@ exports.sellNFT = async (req, res) => {
       return res.status(404).json({ error: "Reservation not found" });
     }
 
+    // ✅ Prevent double selling
+    if (reservation.status === 'sold') {
+      return res.status(400).json({ error: "NFT already sold" });
+    }
+
     const user = await User.findById(reservation.userId);
     if (!user) {
       return res.status(404).json({ error: "User not found" });
     }
 
-    // Fetch the NFT using nftId from reservation
     const nft = await Nft.findById(reservation.nftId);
     if (!nft) {
       return res.status(404).json({ error: "NFT not found" });
@@ -101,8 +105,8 @@ exports.sellNFT = async (req, res) => {
     const nftPrice = nft.price;
     const level = Number(user.level) || 1;
 
-    // Determine profit percent based on user level
-    let profitPercent = 0.018; // default for level 1
+    // Profit percent logic
+    let profitPercent = 0.018;
     if (level === 2) profitPercent = 0.022;
     else if (level === 3) profitPercent = 0.028;
     else if (level === 4) profitPercent = 0.032;
@@ -111,11 +115,11 @@ exports.sellNFT = async (req, res) => {
 
     const profit = parseFloat((nftPrice * profitPercent).toFixed(2));
 
-    // Add profit to user's balance
+    // ✅ Add profit to user's balance
     user.balance += profit;
     await user.save();
 
-    // Team revenue sharing
+    // ✅ Team revenue sharing
     const teamProfit = nftPrice * profitPercent;
     const teamRevenue = [
       { ref: user.teamA, percent: 0.15 },
@@ -134,7 +138,7 @@ exports.sellNFT = async (req, res) => {
       }
     }
 
-    // Mark reservation as sold
+    // ✅ Mark reservation as sold
     reservation.status = 'sold';
     reservation.soldAt = new Date();
     reservation.profit = profit;

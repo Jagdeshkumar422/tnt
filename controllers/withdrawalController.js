@@ -10,6 +10,11 @@ exports.submitWithdrawalRequest = async (req, res) => {
     const user = await User.findById(userId);
     if (!user) return res.status(404).json({ msg: "User not found" });
 
+    // ✅ Minimum withdrawal check
+    if (parseFloat(amount) < 30) {
+      return res.status(400).json({ msg: "Minimum withdrawal amount is 30" });
+    }
+
     // ✅ Check email verification code
     if (user.emailCode !== emailCode || user.emailCodeExpires < Date.now()) {
       return res.status(400).json({ msg: "Invalid or expired email code" });
@@ -32,7 +37,20 @@ exports.submitWithdrawalRequest = async (req, res) => {
       return res.status(400).json({ msg: "Insufficient balance" });
     }
 
-    // ✅ Create withdrawal request (do NOT deduct yet)
+    // ✅ Check if user has already made a withdrawal today
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const existingRequest = await WithdrawalRequest.findOne({
+      userId,
+      createdAt: { $gte: today }
+    });
+
+    if (existingRequest) {
+      return res.status(400).json({ msg: "You can only make one withdrawal per day" });
+    }
+
+    // ✅ Create withdrawal request
     const request = new WithdrawalRequest({
       userId,
       amount,

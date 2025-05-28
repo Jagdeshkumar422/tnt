@@ -20,11 +20,33 @@ const createNowPaymentInvoice = async (req, res) => {
   }
 
   try {
-    // Check for existing pending deposit
-    const existing = await PendingDeposit.findOne({ userId, currency: currency.toLowerCase(), network: network.toLowerCase() });
+    // ✅ Check if user already has a deposit or pending deposit today
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const hasDepositToday = await Deposit.findOne({
+      userId,
+      timestamp: { $gte: today }
+    });
+
+    const hasPendingToday = await PendingDeposit.findOne({
+      userId,
+      createdAt: { $gte: today }
+    });
+
+    if (hasDepositToday || hasPendingToday) {
+      return res.status(400).json({ error: 'You can only deposit once per day' });
+    }
+
+    // ✅ Check for existing pending deposit (backwards compatibility)
+    const existing = await PendingDeposit.findOne({
+      userId,
+      currency: currency.toLowerCase(),
+      network: network.toLowerCase()
+    });
     if (existing) return res.status(200).json(existing.invoiceData);
 
-    // Create invoice
+    // ✅ Create invoice
     const invoicePayload = {
       price_amount: amount,
       price_currency: 'usd',
@@ -65,7 +87,7 @@ const createNowPaymentInvoice = async (req, res) => {
       return res.status(500).json({ error: 'Failed to generate payment address' });
     }
 
-    // Address format check
+    // ✅ Address format check
     if (network.toLowerCase() === 'bep20' && !generatedAddress.startsWith('0x')) {
       return res.status(500).json({ error: 'Invalid BEP20 address format' });
     }
@@ -73,7 +95,7 @@ const createNowPaymentInvoice = async (req, res) => {
       return res.status(500).json({ error: 'Invalid TRC20 address format' });
     }
 
-    // Save to pending
+    // ✅ Save to pending
     const pending = new PendingDeposit({
       userId,
       currency: currency.toLowerCase(),
@@ -90,6 +112,7 @@ const createNowPaymentInvoice = async (req, res) => {
     res.status(500).json({ error: 'Failed to create invoice', details: err.response?.data || err.message });
   }
 };
+
 
 // Handle referral bonus logic
 const handleReferralBonus = async (userId, actually_paid) => {
