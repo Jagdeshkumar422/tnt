@@ -373,63 +373,130 @@ exports.updateUser = async (req, res) => {
 const verificationCodes = {}; // In-memory temporary store
 
 // Send verification code to email
+// exports.changePasswordSendCode = async (req, res) => {
+//   try {
+//     const { email } = req.body;
+
+//     if (!email) {
+//       return res.status(400).json({ message: 'Email is required' });
+//     }
+
+//     const generatedCode = Math.floor(100000 + Math.random() * 900000); // 6-digit code
+//     verificationCodes[email] = generatedCode;
+
+//     const transporter = nodemailer.createTransport({
+//       service: 'Gmail',
+//       auth: {
+//         user: 'treasusrexnft@gmail.com',
+//         pass: 'yucz gkfw cmyv scpm' // Replace with secure app password
+//       },
+//     });
+
+//     await transporter.sendMail({
+//       to: email,
+//       subject: 'Password Reset Code',
+//       text: `Your password reset code is: ${generatedCode}`,
+//     });
+
+//     res.status(200).json({ message: 'Verification code sent' });
+
+//   } catch (error) {
+//     console.error('Error sending code:', error);
+//     res.status(500).json({ message: 'Failed to send verification code' });
+//   }
+// };
+
+// // Reset password using verification code
+// exports.changePassword = async (req, res) => {
+//   try {
+//     const { email, code, newPassword } = req.body;
+
+//     if (!email || !code || !newPassword) {
+//       return res.status(400).json({ message: 'Missing required fields' });
+//     }
+
+//     const storedCode = verificationCodes[email];
+//     if (!storedCode || Number(code) !== storedCode) {
+//       return res.status(400).json({ message: 'Invalid or expired code' });
+//     }
+
+  
+//     await User.findOneAndUpdate({ email }, { password: newPassword });
+
+//     delete verificationCodes[email];
+
+//     res.status(200).json({ message: 'Password has been reset successfully' });
+
+//   } catch (error) {
+//     console.error('Error resetting password:', error);
+//     res.status(500).json({ message: 'Failed to reset password' });
+//   }
+// };
+
+const VerificationCode = require("../models/VerificationCode");
+
+// Send code to email
 exports.changePasswordSendCode = async (req, res) => {
   try {
     const { email } = req.body;
+    if (!email) return res.status(400).json({ message: "Email is required" });
 
-    if (!email) {
-      return res.status(400).json({ message: 'Email is required' });
-    }
+    const code = Math.floor(100000 + Math.random() * 900000).toString();
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 mins
 
-    const generatedCode = Math.floor(100000 + Math.random() * 900000); // 6-digit code
-    verificationCodes[email] = generatedCode;
+    await VerificationCode.findOneAndUpdate(
+      { email },
+      { code, expiresAt },
+      { upsert: true, new: true }
+    );
 
     const transporter = nodemailer.createTransport({
-      service: 'Gmail',
+      service: "Gmail",
       auth: {
-        user: 'treasusrexnft@gmail.com',
-        pass: 'yucz gkfw cmyv scpm' // Replace with secure app password
+        user: "treasusrexnft@gmail.com",
+        pass: "yucz gkfw cmyv scpm", // Use Gmail app password
       },
     });
 
     await transporter.sendMail({
+      from: '"Treasure NFT" <treasusrexnft@gmail.com>',
       to: email,
-      subject: 'Password Reset Code',
-      text: `Your password reset code is: ${generatedCode}`,
+      subject: "Password Reset Code",
+      text: `Your password reset code is: ${code}`,
     });
 
-    res.status(200).json({ message: 'Verification code sent' });
-
-  } catch (error) {
-    console.error('Error sending code:', error);
-    res.status(500).json({ message: 'Failed to send verification code' });
+    res.status(200).json({ message: "Verification code sent" });
+  } catch (err) {
+    console.error("Error sending code:", err);
+    res.status(500).json({ message: "Failed to send verification code" });
   }
 };
 
-// Reset password using verification code
+// Reset password with code
 exports.changePassword = async (req, res) => {
   try {
     const { email, code, newPassword } = req.body;
 
     if (!email || !code || !newPassword) {
-      return res.status(400).json({ message: 'Missing required fields' });
+      return res.status(400).json({ message: "Missing required fields" });
     }
 
-    const storedCode = verificationCodes[email];
-    if (!storedCode || Number(code) !== storedCode) {
-      return res.status(400).json({ message: 'Invalid or expired code' });
+    const record = await VerificationCode.findOne({ email });
+    if (!record || record.code !== code || Date.now() > record.expiresAt) {
+      return res.status(400).json({ message: "Invalid or expired code" });
     }
 
-  
-    await User.findOneAndUpdate({ email }, { password: newPassword });
+    // const hashedPassword = await bcrypt.hash(newPassword, 10);
 
-    delete verificationCodes[email];
+    const user = await User.findOneAndUpdate({ email }, { password: newPassword });
+    if (!user) return res.status(404).json({ message: "User not found" });
 
-    res.status(200).json({ message: 'Password has been reset successfully' });
+    await VerificationCode.deleteOne({ email });
 
-  } catch (error) {
-    console.error('Error resetting password:', error);
-    res.status(500).json({ message: 'Failed to reset password' });
+    res.status(200).json({ message: "Password has been reset successfully" });
+  } catch (err) {
+    console.error("Error resetting password:", err);
+    res.status(500).json({ message: "Failed to reset password" });
   }
 };
 
