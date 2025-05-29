@@ -548,3 +548,86 @@ exports.getCommunityStats = async (req, res) => {
 
 
 
+
+
+function getStartOfTimeFilter(time) {
+  const now = new Date();
+  now.setHours(0, 0, 0, 0); // Normalize to midnight
+
+  switch (time) {
+    case 'Today':
+      return now;
+    case 'Yesterday':
+      const yesterday = new Date(now);
+      yesterday.setDate(now.getDate() - 1);
+      return yesterday;
+    case 'This week':
+      const weekStart = new Date(now);
+      weekStart.setDate(now.getDate() - now.getDay()); // Sunday as first day
+      return weekStart;
+    case 'This month':
+      return new Date(now.getFullYear(), now.getMonth(), 1);
+    default:
+      return null; // 'All' or unknown
+  }
+}
+
+
+exports.getTeamRevenue = async (req, res) => {
+  const { time = 'All' } = req.query;
+  const startDate = getStartOfTimeFilter(time);
+
+  try {
+    const pipeline = [
+      { $unwind: "$teamRevenueHistory" }
+    ];
+
+    // For Yesterday, need to filter on exact day
+    if (time === 'Yesterday') {
+      const start = getStartOfTimeFilter('Yesterday');
+      const end = new Date(start);
+      end.setDate(end.getDate() + 1);
+
+      pipeline.push({
+        $match: {
+          "teamRevenueHistory.createdAt": {
+            $gte: start,
+            $lt: end
+          }
+        }
+      });
+    } else if (startDate) {
+      pipeline.push({
+        $match: {
+          "teamRevenueHistory.createdAt": { $gte: startDate }
+        }
+      });
+    }
+
+    pipeline.push({
+      $group: {
+        _id: "$teamRevenueHistory.level",
+        total: { $sum: "$teamRevenueHistory.amount" }
+      }
+    });
+
+    const results = await User.aggregate(pipeline);
+
+    let A = 0, B = 0, C = 0;
+    results.forEach(r => {
+      if (r._id === 'A') A = r.total;
+      if (r._id === 'B') B = r.total;
+      if (r._id === 'C') C = r.total;
+    });
+
+    res.json({
+      A: A.toFixed(2),
+      B: B.toFixed(2),
+      C: C.toFixed(2),
+      total: (A + B + C).toFixed(2),
+    });
+  } catch (err) {
+    console.error('Error calculating team revenue:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};

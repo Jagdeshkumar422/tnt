@@ -1,5 +1,5 @@
 const express = require('express');
-const { sendOtp, register, getCountries, login , sendResetOtp, resetPassword, getUsers, getwallet, getBalance, depositeHistory, updateUser, changePasswordSendCode, changePassword, getTodayTeamRevenue, getCommunityStats, updateProfilePic } = require('../controllers/authController');
+const { sendOtp, register, getCountries, login , sendResetOtp, resetPassword, getUsers, getwallet, getBalance, depositeHistory, updateUser, changePasswordSendCode, changePassword, getTodayTeamRevenue, getCommunityStats, updateProfilePic, getTeamRevenue } = require('../controllers/authController');
 const { googleAuthenticator, confirm2FABinding, getgoogleSecretkey, sendEmailCode } = require('../controllers/googleVerificationController');
 const auth = require('../middleware/auth');
 const router = express.Router();
@@ -168,40 +168,41 @@ router.get('/community-stats/:userId', async (req, res) => {
 
   const now = new Date();
   let startDate = null;
+  let endDate = null;
 
-  // Time filter
   switch (time) {
     case 'Today':
       startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      endDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
       break;
     case 'Yesterday':
       startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
+      endDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
       break;
     case 'This week':
       startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() - now.getDay());
+      endDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
       break;
     case 'This month':
       startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+      endDate = new Date(now.getFullYear(), now.getMonth() + 1, 1);
       break;
   }
 
-  const timeFilter = startDate ? { createdAt: { $gte: startDate } } : {};
+  const timeFilter = startDate && endDate
+    ? { createdAt: { $gte: startDate, $lt: endDate } }
+    : {};
 
   try {
-    // TEAM A: users referred by current user
     const teamA = await User.find({ referredBy: userId, ...timeFilter });
-
-    // TEAM B: users referred by teamA members
-    const teamAIds = teamA.map(user => user._id.toString());
+    const teamAIds = teamA.map(u => u._id);
     const teamB = await User.find({ referredBy: { $in: teamAIds }, ...timeFilter });
-
-    // TEAM C: users referred by teamB members
-    const teamBIds = teamB.map(user => user._id.toString());
+    const teamBIds = teamB.map(u => u._id);
     const teamC = await User.find({ referredBy: { $in: teamBIds }, ...timeFilter });
 
     const calcStats = (arr) => ({
       registered: arr.length,
-      active: arr.filter(u => u.balance && u.balance > 0).length
+      active: arr.filter(u => u.balance > 0).length
     });
 
     res.json({
@@ -210,14 +211,17 @@ router.get('/community-stats/:userId', async (req, res) => {
       levels: {
         A: calcStats(teamA),
         B: calcStats(teamB),
-        C: calcStats(teamC)
-      }
+        C: calcStats(teamC),
+      },
     });
   } catch (error) {
     console.error("Community Stats Error:", error);
     res.status(500).json({ message: "Server error", error: error.message });
   }
 });
+
+
+router.get('/team-revenue', auth, getTeamRevenue);
 
 
 module.exports = router;
