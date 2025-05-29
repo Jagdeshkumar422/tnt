@@ -7,44 +7,52 @@ const User = require('../models/User');
 const createNowPaymentInvoice = async (req, res) => {
   const { amount, userId, currency, network } = req.body;
 
+  if (!amount || !userId || !currency || !network) {
+    return res.status(400).json({ error: 'Missing required fields' });
+  }
+
+  const currencyLower = currency.toLowerCase();
+  const networkLower = network.toLowerCase();
+
   const currencyNetworkMap = {
-    'usdt': {
-      'bep20': 'usdtbsc',
-      'trc20': 'usdttrc20',
+    usdt: {
+      bep20: 'usdtbsc',
+      trc20: 'usdttrc20',
     },
   };
 
-  const payCurrency = currencyNetworkMap[currency.toLowerCase()]?.[network.toLowerCase()];
+  const payCurrency = currencyNetworkMap[currencyLower]?.[networkLower];
   if (!payCurrency) {
     return res.status(400).json({ error: 'Unsupported currency or network' });
   }
 
   try {
-    // ✅ Check if user already has a deposit or pending deposit today
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    // ✅ Block only if there's a confirmed deposit today (not just pending)
+    const startOfDay = new Date();
+    startOfDay.setHours(0, 0, 0, 0);
+
+    const endOfDay = new Date();
+    endOfDay.setHours(23, 59, 59, 999);
 
     const hasDepositToday = await Deposit.findOne({
       userId,
-      timestamp: { $gte: today }
+      timestamp: { $gte: startOfDay, $lte: endOfDay },
     });
 
-    const hasPendingToday = await PendingDeposit.findOne({
-      userId,
-      createdAt: { $gte: today }
-    });
-
-    if (hasDepositToday || hasPendingToday) {
+    if (hasDepositToday) {
       return res.status(400).json({ error: 'You can only deposit once per day' });
     }
 
-    // ✅ Check for existing pending deposit (backwards compatibility)
-    const existing = await PendingDeposit.findOne({
+    // ✅ Reuse existing pending deposit if exists
+    const existingPending = await PendingDeposit.findOne({
       userId,
-      currency: currency.toLowerCase(),
-      network: network.toLowerCase()
+      currency: currencyLower,
+      network: networkLower,
     });
-    if (existing) return res.status(200).json(existing.invoiceData);
+
+    if (existingPending) {
+      return res.status(200).json(existingPending.invoiceData);
+    }
 
     // ✅ Create invoice
     const invoicePayload = {
@@ -53,7 +61,7 @@ const createNowPaymentInvoice = async (req, res) => {
       pay_currency: payCurrency,
       order_id: `deposit_${userId}_${Date.now()}`,
       order_description: `Deposit for user ${userId}`,
-      ipn_callback_url: `https://tnt-hhh6.vercel.app/payments/webhook`,
+      ipn_callback_url: `https://tnt-rust.vercel.app/payments/webhook`,
       success_url: `https://treasurenftx.xyz/recharge/success`,
       cancel_url: `https://treasurenftx.xyz/recharge/cancel`,
     };
@@ -69,14 +77,20 @@ const createNowPaymentInvoice = async (req, res) => {
       }
     );
 
-    if (!invoiceRes.data.id) throw new Error('Missing invoice ID');
+    if (!invoiceRes.data.id) {
+      throw new Error('Missing invoice ID');
+    }
 
+    // ✅ Generate pay address
     const paymentRes = await axios.post(
       'https://api.nowpayments.io/v1/invoice-payment',
-      { iid: invoiceRes.data.id, pay_currency: payCurrency },
+      {
+        iid: invoiceRes.data.id,
+        pay_currency: payCurrency,
+      },
       {
         headers: {
-          'x-api-key': process.env.NOWPAYMENTS_API_KEY,
+          'x-api-key': process.env.NOWPAYMENTS_API_KEY || "NHC4BN0-WPGM6DX-NX1RXKD-YDCETVE",
           'Content-Type': 'application/json',
         },
       }
@@ -87,32 +101,33 @@ const createNowPaymentInvoice = async (req, res) => {
       return res.status(500).json({ error: 'Failed to generate payment address' });
     }
 
-    // ✅ Address format check
-    if (network.toLowerCase() === 'bep20' && !generatedAddress.startsWith('0x')) {
-      return res.status(500).json({ error: 'Invalid BEP20 address format' });
-    }
-    if (network.toLowerCase() === 'trc20' && !generatedAddress.startsWith('T')) {
-      return res.status(500).json({ error: 'Invalid TRC20 address format' });
+    // ✅ Address format validation
+    if (
+      (networkLower === 'bep20' && !generatedAddress.startsWith('0x')) ||
+      (networkLower === 'trc20' && !generatedAddress.startsWith('T'))
+    ) {
+      return res.status(500).json({ error: `Invalid ${network} address format` });
     }
 
-    // ✅ Save to pending
+    // ✅ Save to pending deposits
     const pending = new PendingDeposit({
       userId,
-      currency: currency.toLowerCase(),
-      network: network.toLowerCase(),
+      currency: currencyLower,
+      network: networkLower,
       pay_address: generatedAddress,
       invoiceData: paymentRes.data,
     });
 
     await pending.save();
     res.status(200).json(paymentRes.data);
-
   } catch (err) {
     console.error('Create Invoice Error:', err.response?.data || err.message);
-    res.status(500).json({ error: 'Failed to create invoice', details: err.response?.data || err.message });
+    res.status(500).json({
+      error: 'Failed to create invoice',
+      details: err.response?.data || err.message,
+    });
   }
 };
-
 
 // Handle referral bonus logic
 const handleReferralBonus = async (userId, actually_paid) => {
@@ -134,8 +149,8 @@ const handleReferralBonus = async (userId, actually_paid) => {
               amount: bonusA,
               level: 'A',
               createdAt: new Date(),
-            }
-          }
+            },
+          },
         });
 
         if (levelA.referredBy) {
@@ -148,8 +163,8 @@ const handleReferralBonus = async (userId, actually_paid) => {
                   amount: bonusB,
                   level: 'B',
                   createdAt: new Date(),
-                }
-              }
+                },
+              },
             });
 
             if (levelB.referredBy) {
@@ -162,8 +177,8 @@ const handleReferralBonus = async (userId, actually_paid) => {
                       amount: bonusC,
                       level: 'C',
                       createdAt: new Date(),
-                    }
-                  }
+                    },
+                  },
                 });
               }
             }
@@ -175,7 +190,6 @@ const handleReferralBonus = async (userId, actually_paid) => {
     console.error('Referral bonus error:', err);
   }
 };
-
 
 // Webhook for confirming payment
 const handleWebhook = async (req, res) => {
@@ -190,13 +204,14 @@ const handleWebhook = async (req, res) => {
       pay_address,
     } = req.body;
 
-    const userId = order_id.split('_')[1];
+    const userId = order_id?.split('_')[1];
+    if (!userId || !payment_id) return res.status(400).send('Missing required data');
 
     const duplicate = await Deposit.exists({ paymentId: payment_id });
     if (duplicate) return res.status(200).send('Already processed');
 
     if (payment_status === 'finished' || payment_status === 'partially_paid') {
-      const isFirst = !(await Deposit.exists({ userId }));
+      const isFirstDeposit = !(await Deposit.exists({ userId }));
 
       await new Deposit({
         userId,
@@ -210,7 +225,7 @@ const handleWebhook = async (req, res) => {
 
       await PendingDeposit.deleteOne({ userId, pay_address });
 
-      if (isFirst && Number(pay_amount) >= 50) {
+      if (isFirstDeposit && Number(pay_amount) >= 50) {
         const bonus = Number(pay_amount) * 0.07;
         await User.findByIdAndUpdate(userId, {
           $inc: { balance: bonus },
@@ -227,7 +242,6 @@ const handleWebhook = async (req, res) => {
     res.status(500).send('Webhook failed');
   }
 };
-
 
 module.exports = {
   createNowPaymentInvoice,
