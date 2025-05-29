@@ -308,8 +308,7 @@ exports.resetPassword = async (req, res) => {
     const user = await User.findOne({ email });
     if (!user) return res.status(404).json({ message: 'User not found' });
 
-    const hashedPassword = await bcrypt.hash(newPassword, 10);
-    user.password = hashedPassword;
+    user.password = newPassword;
     await user.save();
 
     delete otpStore[email];
@@ -421,8 +420,8 @@ exports.changePassword = async (req, res) => {
       return res.status(400).json({ message: 'Invalid or expired code' });
     }
 
-    const hashedPassword = await bcrypt.hash(newPassword, 10);
-    await User.findOneAndUpdate({ email }, { password: hashedPassword });
+  
+    await User.findOneAndUpdate({ email }, { password: newPassword });
 
     delete verificationCodes[email];
 
