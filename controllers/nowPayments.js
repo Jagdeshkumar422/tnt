@@ -71,7 +71,7 @@ const createNowPaymentInvoice = async (req, res) => {
       invoicePayload,
       {
         headers: {
-          'x-api-key': process.env.NOWPAYMENTS_API_KEY,
+          'x-api-key': process.env.NOWPAYMENTS_API_KEY || 'HTZD0B6-Q8N4DFX-GPXB4P8-HT83X8N',
           'Content-Type': 'application/json',
         },
       }
@@ -90,7 +90,7 @@ const createNowPaymentInvoice = async (req, res) => {
       },
       {
         headers: {
-          'x-api-key': process.env.NOWPAYMENTS_API_KEY || "NHC4BN0-WPGM6DX-NX1RXKD-YDCETVE",
+          'x-api-key': process.env.NOWPAYMENTS_API_KEY || "HTZD0B6-Q8N4DFX-GPXB4P8-HT83X8N",
           'Content-Type': 'application/json',
         },
       }
