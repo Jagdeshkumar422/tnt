@@ -73,7 +73,7 @@ exports.getReservedNfts = async (req, res) => {
   }
 };
 
-// Sell an NFT
+
 exports.sellNFT = async (req, res) => {
   const { reservationId } = req.body;
 
@@ -87,7 +87,6 @@ exports.sellNFT = async (req, res) => {
       return res.status(404).json({ error: "Reservation not found" });
     }
 
-    // ✅ Prevent double selling
     if (reservation.status === 'sold') {
       return res.status(400).json({ error: "NFT already sold" });
     }
@@ -105,7 +104,7 @@ exports.sellNFT = async (req, res) => {
     const nftPrice = nft.price;
     const level = Number(user.level) || 1;
 
-    // Profit percent logic
+    // Profit percent based on user level
     let profitPercent = 0.018;
     if (level === 2) profitPercent = 0.022;
     else if (level === 3) profitPercent = 0.028;
@@ -115,36 +114,46 @@ exports.sellNFT = async (req, res) => {
 
     const profit = parseFloat((nftPrice * profitPercent).toFixed(2));
 
-    // ✅ Add profit to user's balance
+    // Add profit to user
     user.balance += profit;
     await user.save();
 
-    // ✅ Team revenue sharing
+    // Referral bonus chain: A -> B -> C
     const teamProfit = nftPrice * profitPercent;
-    const teamRevenue = [
-      { ref: user.teamA, percent: 0.15 },
-      { ref: user.teamB, percent: 0.07 },
-      { ref: user.teamC, percent: 0.05 },
+    const bonusLevels = [
+      { level: 'A', percent: 0.15 },
+      { level: 'B', percent: 0.07 },
+      { level: 'C', percent: 0.05 },
     ];
 
-    for (const { ref, percent } of teamRevenue) {
-      if (ref) {
-        const refUser = await User.findById(ref);
-        if (refUser) {
-          const bonus = parseFloat((teamProfit * percent).toFixed(2));
-          refUser.balance += bonus;
-          await refUser.save();
-        }
-      }
+    let currentRef = user.referredBy;
+    for (let i = 0; i < bonusLevels.length && currentRef; i++) {
+      const refUser = await User.findById(currentRef);
+      if (!refUser) break;
+
+      const bonusAmount = parseFloat((teamProfit * bonusLevels[i].percent).toFixed(2));
+      refUser.balance += bonusAmount;
+      refUser.teamRevenueHistory.push({
+        amount: bonusAmount,
+        level: bonusLevels[i].level,
+      });
+
+      await refUser.save();
+
+      // Move to next ref chain
+      currentRef = refUser.referredBy;
     }
 
-    // ✅ Mark reservation as sold
+    // Mark reservation as sold
     reservation.status = 'sold';
     reservation.soldAt = new Date();
     reservation.profit = profit;
     await reservation.save();
 
-    res.status(200).json({ message: `NFT sold successfully (Level ${level})`, profit });
+    res.status(200).json({
+      message: `NFT sold successfully (Level ${level})`,
+      profit,
+    });
 
   } catch (err) {
     console.error('Sell failed:', err);

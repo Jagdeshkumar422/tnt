@@ -162,4 +162,62 @@ router.get('/team-members', auth, async (req, res) => {
   }
 });
 
+router.get('/community-stats/:userId', async (req, res) => {
+  const { userId } = req.params;
+  const { time } = req.query;
+
+  const now = new Date();
+  let startDate = null;
+
+  // Time filter
+  switch (time) {
+    case 'Today':
+      startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      break;
+    case 'Yesterday':
+      startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
+      break;
+    case 'This week':
+      startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() - now.getDay());
+      break;
+    case 'This month':
+      startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+      break;
+  }
+
+  const timeFilter = startDate ? { createdAt: { $gte: startDate } } : {};
+
+  try {
+    // TEAM A: users referred by current user
+    const teamA = await User.find({ referredBy: userId, ...timeFilter });
+
+    // TEAM B: users referred by teamA members
+    const teamAIds = teamA.map(user => user._id.toString());
+    const teamB = await User.find({ referredBy: { $in: teamAIds }, ...timeFilter });
+
+    // TEAM C: users referred by teamB members
+    const teamBIds = teamB.map(user => user._id.toString());
+    const teamC = await User.find({ referredBy: { $in: teamBIds }, ...timeFilter });
+
+    const calcStats = (arr) => ({
+      registered: arr.length,
+      active: arr.filter(u => u.balance && u.balance > 0).length
+    });
+
+    res.json({
+      totalRegistered: teamA.length + teamB.length + teamC.length,
+      activeUsers: [...teamA, ...teamB, ...teamC].filter(u => u.balance > 0).length,
+      levels: {
+        A: calcStats(teamA),
+        B: calcStats(teamB),
+        C: calcStats(teamC)
+      }
+    });
+  } catch (error) {
+    console.error("Community Stats Error:", error);
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+});
+
+
 module.exports = router;
