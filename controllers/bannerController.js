@@ -28,6 +28,11 @@ exports.getBanners = async (req, res) => {
           imageUrl:
             "https://res.cloudinary.com/di0qbhv97/image/upload/v1746530122/nfts/vye5f4giajcpy3lebm9c.png",
         },
+         {
+          order: 5,
+          imageUrl:
+            "https://res.cloudinary.com/di0qbhv97/image/upload/v1746530122/nfts/vye5f4giajcpy3lebm9c.png",
+        },
       ];
 
       await Banner.insertMany(defaultBanners);
@@ -45,7 +50,7 @@ exports.getBanners = async (req, res) => {
 exports.seedBanners = async (req, res) => {
   try {
     const count = await Banner.countDocuments();
-    if (count >= 4)
+    if (count >= 5)
       return res.status(400).json({ message: "Banners already seeded" });
 
     const defaultBanners = [
@@ -69,6 +74,11 @@ exports.seedBanners = async (req, res) => {
         imageUrl:
           "https://res.cloudinary.com/di0qbhv97/image/upload/v1746530122/nfts/vye5f4giajcpy3lebm9c.png",
       },
+      {
+        order: 5,
+        imageUrl:
+          "https://res.cloudinary.com/di0qbhv97/image/upload/v1746530122/nfts/vye5f4giajcpy3lebm9c.png",
+      },
     ];
 
     await Banner.insertMany(defaultBanners);
@@ -85,7 +95,7 @@ exports.updateBanner = async (req, res) => {
     const { order } = req.params;
     const bannerOrder = parseInt(order);
 
-    if (![1, 2, 3, 4].includes(bannerOrder)) {
+    if (![1, 2, 3, 4, 5].includes(bannerOrder)) {
       return res
         .status(400)
         .json({ message: "Invalid order (must be 1-4)" });
