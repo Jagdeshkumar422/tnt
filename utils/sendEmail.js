@@ -2,10 +2,12 @@ const nodemailer = require('nodemailer');
 
 exports.sendOTP = async (email, code) => {
   let transporter = nodemailer.createTransport({
-    service: 'Gmail',
+    host: 'smtp.hostinger.com',
+    port: 465, // Use 465 for secure SSL
+    secure: true,
     auth: {
-      user: 'treasusrexnft@gmail.com',
-      pass: 'yucz gkfw cmyv scpm'  // Make sure this app password is valid and kept secret
+      user: 'services@treasurenftx.xyz', // Must match 'from' address
+      pass: 'Treasurexnft@1' // Email password (or app password if required)
     }
   });
 
@@ -27,7 +29,7 @@ exports.sendOTP = async (email, code) => {
   `;
 
   await transporter.sendMail({
-    from: '"Treasure" <treasusrexnft@gmail.com>',
+    from: '"Treasure" <services@treasurenftx.xyz>', // ✅ Must match SMTP user
     to: email,
     subject: 'Email Verification Code from Treasure',
     html: htmlTemplate

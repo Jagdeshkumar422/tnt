@@ -450,13 +450,15 @@ exports.changePasswordSendCode = async (req, res) => {
       { upsert: true, new: true }
     );
 
-    const transporter = nodemailer.createTransport({
-      service: "Gmail",
-      auth: {
-        user: "treasusrexnft@gmail.com",
-        pass: "yucz gkfw cmyv scpm", // Use Gmail app password
-      },
-    });
+    let transporter = nodemailer.createTransport({
+       host: 'smtp.hostinger.com',
+       port: 465, // Use 465 for secure SSL
+       secure: true,
+       auth: {
+         user: 'services@treasurenftx.xyz', // Must match 'from' address
+         pass: 'Treasurexnft@1' // Email password (or app password if required)
+       }
+     });
 
     await transporter.sendMail({
       from: '"Treasure NFT" <treasusrexnft@gmail.com>',

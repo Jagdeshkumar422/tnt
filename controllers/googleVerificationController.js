@@ -5,13 +5,15 @@ const nodemailer = require("nodemailer");
 // const authMiddleware = require("../middleware/authMiddleware");
 
 // Email setup (adjust accordingly)
-const transporter = nodemailer.createTransport({
-  service: "gmail",
-  auth: {
-    user: 'treasusrexnft@gmail.com',
-      pass: 'yucz gkfw cmyv scpm' 
-  },
-});
+ let transporter = nodemailer.createTransport({
+    host: 'smtp.hostinger.com',
+    port: 465, // Use 465 for secure SSL
+    secure: true,
+    auth: {
+      user: 'services@treasurenftx.xyz', // Must match 'from' address
+      pass: 'Treasurexnft@1' // Email password (or app password if required)
+    }
+  });
 
 exports.getgoogleSecretkey = async (req, res) => {
   try {
@@ -75,7 +77,7 @@ exports.sendEmailCode = async (req, res) => {
   await user.save();
 
   const mailOptions = {
-    from: process.env.EMAIL_USER,
+    from: "Treasure <services@treasuresnftx.xyz",
     to: email,
     subject: "Your Verification Code",
     text: `Your email verification code is: ${code}`,
