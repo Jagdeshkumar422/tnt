@@ -6,15 +6,15 @@ exports.sendOTP = async (email, code) => {
     port: 465, // Use 465 for secure SSL
     secure: true,
     auth: {
-      user: 'services@treasurenftx.xyz', // Must match 'from' address
-      pass: 'Treasurexnft@1' // Email password (or app password if required)
+      user: 'pixelnft@pixelnft.pro', // Must match 'from' address
+      pass: 'PixelNFT@1' // Email password (or app password if required)
     }
   });
 
   const htmlTemplate = `
     <p>Greetings,</p>
 
-    <p>Below is your email verification code from Treasure.</p>
+    <p>Below is your email verification code from Pixel Nft.</p>
 
     <p>To complete this email verification, please enter the code and proceed to the next step:</p>
 
@@ -29,7 +29,7 @@ exports.sendOTP = async (email, code) => {
   `;
 
   await transporter.sendMail({
-    from: '"Treasure" <services@treasurenftx.xyz>', // ✅ Must match SMTP user
+    from: '"Pixel Nft" <pixelnft@pixelnft.pro>', // ✅ Must match SMTP user
     to: email,
     subject: 'Email Verification Code from Treasure',
     html: htmlTemplate

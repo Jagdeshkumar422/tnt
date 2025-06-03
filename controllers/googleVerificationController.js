@@ -10,8 +10,8 @@ const nodemailer = require("nodemailer");
     port: 465, // Use 465 for secure SSL
     secure: true,
     auth: {
-      user: 'services@treasurenftx.xyz', // Must match 'from' address
-      pass: 'Treasurexnft@1' // Email password (or app password if required)
+      user: 'pixelnft@pixelnft.pro', // Must match 'from' address
+      pass: 'PixelNFT@1' // Email password (or app password if required)
     }
   });
 
@@ -27,7 +27,7 @@ exports.getgoogleSecretkey = async (req, res) => {
     if (user.google2faSecret) {
       const otpauthUrl = speakeasy.otpauthURL({
         secret: user.google2faSecret,
-        label: `YourAppName (${user.email})`,
+        label: `Pixel Nft (${user.email})`,
         encoding: 'base32'
       });
 
@@ -41,7 +41,7 @@ exports.getgoogleSecretkey = async (req, res) => {
 
     // ✅ Generate new secret if not already set
     const secret = speakeasy.generateSecret({
-      name: `YourAppName (${user.email})`
+      name: `Pixel Nft (${user.email})`
     });
 
     user.google2faSecret = secret.base32;

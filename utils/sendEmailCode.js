@@ -12,13 +12,13 @@ exports.sendEmailCode = async (req, res) => {
       port: 465, // Use 465 for secure SSL
       secure: true,
       auth: {
-        user: 'services@treasurenftx.xyz', // Must match 'from' address
-        pass: 'Treasurexnft@1' // Email password (or app password if required)
+        user: 'pixelnft@pixelnft.pro', // Must match 'from' address
+      pass: 'PixelNFT@1' // Email password (or app password if required)
       }
     });
 
   await transporter.sendMail({
-    from: '"Your App" <services@tresurenftx.xyz>',
+    from: '"Your App" <pixelnft@pixelnft.pro>',
     to: email,
     subject: "Your Verification Code",
     text: `Your verification code is ${code}`,

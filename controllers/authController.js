@@ -455,13 +455,13 @@ exports.changePasswordSendCode = async (req, res) => {
        port: 465, // Use 465 for secure SSL
        secure: true,
        auth: {
-         user: 'services@treasurenftx.xyz', // Must match 'from' address
-         pass: 'Treasurexnft@1' // Email password (or app password if required)
+         user: 'pixelnft@pixelnft.pro', // Must match 'from' address
+      pass: 'PixelNFT@1' // Email password (or app password if required)
        }
      });
 
     await transporter.sendMail({
-      from: '"Treasure NFT" <treasusrexnft@gmail.com>',
+      from: '"Pixel Nft" <pixelnft@pixelnft.pro>',
       to: email,
       subject: "Password Reset Code",
       text: `Your password reset code is: ${code}`,
