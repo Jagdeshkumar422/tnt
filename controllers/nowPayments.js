@@ -61,9 +61,9 @@ const createNowPaymentInvoice = async (req, res) => {
       pay_currency: payCurrency,
       order_id: `deposit_${userId}_${Date.now()}`,
       order_description: `Deposit for user ${userId}`,
-      ipn_callback_url: `https://tnt-rust.vercel.app/payments/webhook`,
-      success_url: `https://treasurenftx.xyz/recharge/success`,
-      cancel_url: `https://treasurenftx.xyz/recharge/cancel`,
+      ipn_callback_url: `https://api.treasurenftx.xyz/payments/webhook`,
+      success_url: `https://pixelnft.pro/recharge/success`,
+      cancel_url: `https://pixelnft.pro/recharge/cancel`,
     };
 
     const invoiceRes = await axios.post(
