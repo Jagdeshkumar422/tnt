@@ -74,7 +74,7 @@ do {
         return res.status(400).json({ message: 'Invalid invitation code' });
       }
     } else {
-      if (invitation !== 'TREASURENFTX') {
+      if (invitation !== 'PixelNFT') {
         return res.status(400).json({ message: 'Invalid invitation code for first user' });
       }
     }
