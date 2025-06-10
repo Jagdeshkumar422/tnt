@@ -12,7 +12,7 @@ router.get('/check-deposits', async (req, res) => {
       const exists = await Deposit.findOne({ txId: d.txId });
       if (!exists) {
         await Deposit.create({
-          userId: "user123", // later map this properly
+          userId: "user123", 
           address: d.address,
           amount: d.amount,
           currency: d.coin,
