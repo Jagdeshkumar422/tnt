@@ -642,15 +642,16 @@ function getStartOfTimeFilter(time) {
 
 
 exports.getTeamRevenue = async (req, res) => {
+  const userId = req.user._id; // Get logged-in user's ID from middleware
   const { time = 'All' } = req.query;
   const startDate = getStartOfTimeFilter(time);
 
   try {
     const pipeline = [
+      { $match: { _id: userId } }, // Only get the logged-in user's data
       { $unwind: "$teamRevenueHistory" }
     ];
 
-    // For Yesterday, need to filter on exact day
     if (time === 'Yesterday') {
       const start = getStartOfTimeFilter('Yesterday');
       const end = new Date(start);
