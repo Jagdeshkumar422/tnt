@@ -18,7 +18,7 @@ exports.sendEmailCode = async (req, res) => {
     });
 
   await transporter.sendMail({
-    from: '"Your App" <pixelnft@pixelnft.pro>',
+    from: '"Pixel NFT" <pixelnft@pixelnft.pro>',
     to: email,
     subject: "Your Verification Code",
     text: `Your verification code is ${code}`,

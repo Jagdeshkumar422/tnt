@@ -77,7 +77,7 @@ exports.sendEmailCode = async (req, res) => {
   await user.save();
 
   const mailOptions = {
-    from: "P <pixelNft@pixelNft.pro",
+    from: "Pixel NFT <pixelNft@pixelNft.pro",
     to: email,
     subject: "Your Verification Code",
     text: `Your email verification code is: ${code}`,
