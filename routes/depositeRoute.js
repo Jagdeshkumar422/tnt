@@ -2,6 +2,58 @@ const express = require('express');
 const router = express.Router();
 const { getDepositHistory } = require('../config/binance');
 const Deposit = require('../models/Deposit');
+const mongoose = require("mongoose")
+
+// router.post('/', async (req, res) => {
+//     try {
+//         // Extract data from the request body
+//         const { userId, paymentId, amount, currency, address, status, timestamp } = req.body;
+
+//         // Basic validation: Check for required fields
+//         if (!userId || !amount || !currency || !address) {
+//             return res.status(400).json({ message: 'Missing required fields: userId, amount, currency, address.' });
+//         }
+
+//         // Optional: Ensure paymentId is unique or generate one if not provided
+//         // This helps prevent duplicate deposits for the same transaction
+//         let finalPaymentId = paymentId;
+//         if (!finalPaymentId) {
+//             finalPaymentId = new mongoose.Types.ObjectId().toString(); // Generate a unique string ID
+//         } else {
+//             // Check if provided paymentId already exists
+//             const existingDeposit = await Deposit.findOne({ paymentId: finalPaymentId });
+//             if (existingDeposit) {
+//                 return res.status(409).json({ message: `Deposit with paymentId '${finalPaymentId}' already exists.` });
+//             }
+//         }
+
+//         // Create a new Deposit instance
+//         const newDeposit = new Deposit({
+//             userId: userId,
+//             paymentId: finalPaymentId,
+//             amount: amount,
+//             currency: currency,
+//             address: address,
+//             status: status || 'Pending', // Default status if not provided
+//             timestamp: timestamp ? new Date(timestamp) : new Date(), // Use provided timestamp or current date/time
+//         });
+
+//         // Save the new deposit to the database
+//         const savedDeposit = await newDeposit.save();
+
+//         // Respond with the created deposit and 201 status (Created)
+//         res.status(201).json(savedDeposit);
+
+//     } catch (error) {
+//         console.error('Error creating deposit:', error);
+//         // Handle Mongoose duplicate key error (e.g., if paymentId was set as unique in schema)
+//         if (error.code === 11000) {
+//             return res.status(409).json({ message: 'A deposit with the provided unique ID already exists.', error: error.message });
+//         }
+//         // General server error
+//         res.status(500).json({ message: 'Server error while creating deposit.', error: error.message });
+//     }
+// });
 
 router.get('/check-deposits', async (req, res) => {
   try {

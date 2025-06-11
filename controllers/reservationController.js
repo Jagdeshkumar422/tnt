@@ -105,7 +105,7 @@ exports.sellNFT = async (req, res) => {
     const level = Number(user.level) || 1;
 
     // Profit percent based on user level
-    let profitPercent = 0.028;
+    let profitPercent = 0.02;
     if (level === 2) profitPercent = 0.028;
     else if (level === 3) profitPercent = 0.028;
     else if (level === 4) profitPercent = 0.032;
