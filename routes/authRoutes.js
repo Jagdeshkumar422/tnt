@@ -145,9 +145,9 @@ router.delete('/user/:id', async (req, res) => {
 router.get('/team-members', auth, async (req, res) => {
   try {
     const user = await User.findById(req.user.id)
-      .populate('teamA', 'username email createdAt profilePic level')
-      .populate('teamB', 'username email createdAt profilePic level')
-      .populate('teamC', 'username email createdAt profilePic level');
+      .populate('teamA', 'username email createdAt profilePic level balance')
+      .populate('teamB', 'username email createdAt profilePic level balance')
+      .populate('teamC', 'username email createdAt profilePic level balance');
 
     if (!user) return res.status(404).json({ message: 'User not found' });
 
