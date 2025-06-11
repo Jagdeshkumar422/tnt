@@ -1,198 +1,14 @@
+const mongoose = require('mongoose');
 const axios = require('axios');
 const Deposit = require('../models/Deposit');
 const PendingDeposit = require('../models/PendingDeposit');
 const User = require('../models/User');
 
-// Create Invoice and Payment Address
-const createNowPaymentInvoice = async (req, res) => {
-  const { amount, userId, currency, network } = req.body;
-
-  if (!amount || !userId || !currency || !network) {
-    return res.status(400).json({ error: 'Missing required fields' });
-  }
-
-  const currencyLower = currency.toLowerCase();
-  const networkLower = network.toLowerCase();
-
-  const currencyNetworkMap = {
-    usdt: {
-      bep20: 'usdtbsc',
-      trc20: 'usdttrc20',
-    },
-  };
-
-  const payCurrency = currencyNetworkMap[currencyLower]?.[networkLower];
-  if (!payCurrency) {
-    return res.status(400).json({ error: 'Unsupported currency or network' });
-  }
-
-  try {
-    // ✅ Block only if there's a confirmed deposit today (not just pending)
-    const startOfDay = new Date();
-    startOfDay.setHours(0, 0, 0, 0);
-
-    const endOfDay = new Date();
-    endOfDay.setHours(23, 59, 59, 999);
-
-    const hasDepositToday = await Deposit.findOne({
-      userId,
-      timestamp: { $gte: startOfDay, $lte: endOfDay },
-    });
-
-    if (hasDepositToday) {
-      return res.status(400).json({ error: 'You can only deposit once per day' });
-    }
-
-    // ✅ Reuse existing pending deposit if exists
-    const existingPending = await PendingDeposit.findOne({
-      userId,
-      currency: currencyLower,
-      network: networkLower,
-    });
-
-    if (existingPending) {
-      return res.status(200).json(existingPending.invoiceData);
-    }
-
-    // ✅ Create invoice
-    const invoicePayload = {
-      price_amount: amount,
-      price_currency: 'usd',
-      pay_currency: payCurrency,
-      order_id: `deposit_${userId}_${Date.now()}`,
-      order_description: `Deposit for user ${userId}`,
-      ipn_callback_url: `https://api.treasurenftx.xyz/payments/webhook`,
-      success_url: `https://pixelnft.pro/recharge/success`,
-      cancel_url: `https://pixelnft.pro/recharge/cancel`,
-    };
-
-    const invoiceRes = await axios.post(
-      'https://api.nowpayments.io/v1/invoice',
-      invoicePayload,
-      {
-        headers: {
-          'x-api-key': 'HTZD0B6-Q8N4DFX-GPXB4P8-HT83X8N',
-          'Content-Type': 'application/json',
-        },
-      }
-    );
-
-    if (!invoiceRes.data.id) {
-      throw new Error('Missing invoice ID');
-    }
-
-    // ✅ Generate pay address
-    const paymentRes = await axios.post(
-      'https://api.nowpayments.io/v1/invoice-payment',
-      {
-        iid: invoiceRes.data.id,
-        pay_currency: payCurrency,
-      },
-      {
-        headers: {
-          'x-api-key': "HTZD0B6-Q8N4DFX-GPXB4P8-HT83X8N",
-          'Content-Type': 'application/json',
-        },
-      }
-    );
-
-    const generatedAddress = paymentRes.data.pay_address;
-    if (!generatedAddress) {
-      return res.status(500).json({ error: 'Failed to generate payment address' });
-    }
-
-    // ✅ Address format validation
-    if (
-      (networkLower === 'bep20' && !generatedAddress.startsWith('0x')) ||
-      (networkLower === 'trc20' && !generatedAddress.startsWith('T'))
-    ) {
-      return res.status(500).json({ error: `Invalid ${network} address format` });
-    }
-
-    // ✅ Save to pending deposits
-    const pending = new PendingDeposit({
-      userId,
-      currency: currencyLower,
-      network: networkLower,
-      pay_address: generatedAddress,
-      invoiceData: paymentRes.data,
-    });
-
-    await pending.save();
-    res.status(200).json(paymentRes.data);
-  } catch (err) {
-    console.error('Create Invoice Error:', err.response?.data || err.message);
-    res.status(500).json({
-      error: 'Failed to create invoice',
-      details: err.response?.data || err.message,
-    });
-  }
-};
-
-// Handle referral bonus logic
-const handleReferralBonus = async (userId, actually_paid) => {
-  try {
-    const user = await User.findById(userId);
-    if (!user) return;
-
-    const bonusA = actually_paid * 0.15;
-    const bonusB = actually_paid * 0.07;
-    const bonusC = actually_paid * 0.05;
-
-    if (user.referredBy) {
-      const levelA = await User.findById(user.referredBy);
-      if (levelA) {
-        await User.findByIdAndUpdate(levelA._id, {
-          $inc: { balance: bonusA },
-          $push: {
-            teamRevenueHistory: {
-              amount: bonusA,
-              level: 'A',
-              createdAt: new Date(),
-            },
-          },
-        });
-
-        if (levelA.referredBy) {
-          const levelB = await User.findById(levelA.referredBy);
-          if (levelB) {
-            await User.findByIdAndUpdate(levelB._id, {
-              $inc: { balance: bonusB },
-              $push: {
-                teamRevenueHistory: {
-                  amount: bonusB,
-                  level: 'B',
-                  createdAt: new Date(),
-                },
-              },
-            });
-
-            if (levelB.referredBy) {
-              const levelC = await User.findById(levelB.referredBy);
-              if (levelC) {
-                await User.findByIdAndUpdate(levelC._id, {
-                  $inc: { balance: bonusC },
-                  $push: {
-                    teamRevenueHistory: {
-                      amount: bonusC,
-                      level: 'C',
-                      createdAt: new Date(),
-                    },
-                  },
-                });
-              }
-            }
-          }
-        }
-      }
-    }
-  } catch (err) {
-    console.error('Referral bonus error:', err);
-  }
-};
-
 // Webhook for confirming payment
 const handleWebhook = async (req, res) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
   try {
     const {
       payment_id,
@@ -204,42 +20,179 @@ const handleWebhook = async (req, res) => {
       pay_address,
     } = req.body;
 
-    const userId = order_id?.split('_')[1];
-    if (!userId || !payment_id) return res.status(400).send('Missing required data');
+    // Validate required fields
+    if (!payment_id || !order_id || !pay_amount || !actually_paid || !pay_address) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(400).send('Missing required data');
+    }
 
-    const duplicate = await Deposit.exists({ paymentId: payment_id });
-    if (duplicate) return res.status(200).send('Already processed');
+    const userId = order_id.split('_')[1];
+    if (!userId) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(400).send('Invalid order ID format');
+    }
 
+    // Check for duplicate deposit
+    const duplicate = await Deposit.exists({ paymentId: payment_id }).session(session);
+    if (duplicate) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(200).send('Already processed');
+    }
+
+    // Process only confirmed or partially paid deposits
     if (payment_status === 'finished' || payment_status === 'partially_paid') {
-      const isFirstDeposit = !(await Deposit.exists({ userId }));
+      // Find user
+      const user = await User.findById(userId).session(session);
+      if (!user) {
+        await session.abortTransaction();
+        session.endSession();
+        return res.status(404).send('User not found');
+      }
 
-      await new Deposit({
+      // Check if this is the user's first deposit
+      const isFirstDeposit = !(await Deposit.exists({ userId }).session(session));
+
+      // Convert amounts to numbers and validate
+      const actualAmount = Number(actually_paid);
+      const payAmount = Number(pay_amount);
+      if (isNaN(actualAmount) || isNaN(payAmount) || actualAmount <= 0) {
+        await session.abortTransaction();
+        session.endSession();
+        return res.status(400).send('Invalid payment amount');
+      }
+
+      // Create deposit record
+      const deposit = new Deposit({
         userId,
         paymentId: payment_id,
-        amount: Number(actually_paid),
+        amount: actualAmount,
         currency: pay_currency,
         address: pay_address,
         status: payment_status,
         timestamp: new Date(),
-      }).save();
+      });
+      await deposit.save({ session });
 
-      await PendingDeposit.deleteOne({ userId, pay_address });
+      // Update user balance with the deposited amount
+      await User.findByIdAndUpdate(
+        userId,
+        { $inc: { balance: actualAmount } },
+        { session }
+      );
 
-      if (isFirstDeposit && Number(pay_amount) >= 50) {
-        const bonus = Number(pay_amount) * 0.07;
-        await User.findByIdAndUpdate(userId, {
-          $inc: { balance: bonus },
-          $set: { level: 1 },
-        });
+      // Handle first deposit bonus (if applicable)
+      if (isFirstDeposit && payAmount >= 50) {
+        const bonus = payAmount * 0.07;
+        await User.findByIdAndUpdate(
+          userId,
+          {
+            $inc: { balance: bonus },
+            $set: { level: 1 },
+          },
+          { session }
+        );
       }
 
-      await handleReferralBonus(userId, Number(actually_paid));
-    }
+      // Remove pending deposit
+      await PendingDeposit.deleteOne({ userId, pay_address }).session(session);
 
-    res.status(200).send('Webhook received');
+      // Handle referral bonuses
+      await handleReferralBonus(userId, actualAmount, session);
+
+      // Commit transaction
+      await session.commitTransaction();
+      session.endSession();
+
+      res.status(200).send('Webhook received');
+    } else {
+      // If payment is not confirmed, acknowledge but don't process
+      await session.abortTransaction();
+      session.endSession();
+      res.status(200).send('Webhook received but payment not confirmed');
+    }
   } catch (err) {
+    await session.abortTransaction();
+    session.endSession();
     console.error('Webhook error:', err);
     res.status(500).send('Webhook failed');
+  }
+};
+
+// Handle referral bonus logic (updated to use session)
+const handleReferralBonus = async (userId, actually_paid, session) => {
+  try {
+    const user = await User.findById(userId).session(session);
+    if (!user) return;
+
+    const bonusA = actually_paid * 0.15;
+    const bonusB = actually_paid * 0.07;
+    const bonusC = actually_paid * 0.05;
+
+    if (user.referredBy) {
+      const levelA = await User.findById(user.referredBy).session(session);
+      if (levelA) {
+        await User.findByIdAndUpdate(
+          levelA._id,
+          {
+            $inc: { balance: bonusA },
+            $push: {
+              teamRevenueHistory: {
+                amount: bonusA,
+                level: 'A',
+                createdAt: new Date(),
+              },
+            },
+          },
+          { session }
+        );
+
+        if (levelA.referredBy) {
+          const levelB = await User.findById(levelA.referredBy).session(session);
+          if (levelB) {
+            await User.findByIdAndUpdate(
+              levelB._id,
+              {
+                $inc: { balance: bonusB },
+                $push: {
+                  teamRevenueHistory: {
+                    amount: bonusB,
+                    level: 'B',
+                    createdAt: new Date(),
+                  },
+                },
+              },
+              { session }
+            );
+
+            if (levelB.referredBy) {
+              const levelC = await User.findById(levelB.referredBy).session(session);
+              if (levelC) {
+                await User.findByIdAndUpdate(
+                  levelC._id,
+                  {
+                    $inc: { balance: bonusC },
+                    $push: {
+                      teamRevenueHistory: {
+                        amount: bonusC,
+                        level: 'C',
+                        createdAt: new Date(),
+                      },
+                    },
+                  },
+                  { session }
+                );
+              }
+            }
+          }
+        }
+      }
+    }
+  } catch (err) {
+    console.error('Referral bonus error:', err);
+    throw err; // Rethrow to let the transaction handle the rollback
   }
 };
 
