@@ -218,7 +218,7 @@ const handleWebhook = async (req, res) => {
 
       await PendingDeposit.deleteOne({ userId, pay_address });
 
-      if (isFirstDeposit && Number(pay_amount) >= 50) {
+      if (isFirstDeposit && Number(pay_amount) >= 48) {
         const bonus = Number(pay_amount) * 0.07;
         await User.findByIdAndUpdate(userId, {
           $inc: { balance: bonus },
