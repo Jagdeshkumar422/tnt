@@ -1,13 +1,13 @@
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 
-// const depositSchema = new mongoose.Schema({
-//   txHash: { type: String, required: true },
-//   amount: { type: Number, required: true },
-//   network: { type: String, enum: ['BEP20', 'TRC20'], required: true },
-//   confirmed: { type: Boolean, default: false },
-//   timestamp: { type: Date, default: Date.now },
-// });
+const depositSchema = new mongoose.Schema({
+  txHash: { type: String, required: true },
+  amount: { type: Number, required: true },
+  network: { type: String, enum: ['BEP20', 'TRC20'], required: true },
+  confirmed: { type: Boolean, default: false },
+  timestamp: { type: Date, default: Date.now },
+});
 
 const userSchema = new mongoose.Schema({
   username: {
