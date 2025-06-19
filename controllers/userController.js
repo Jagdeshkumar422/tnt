@@ -1,7 +1,7 @@
 const User = require("../models/User")
 const nodemailer = require("nodemailer");
 const jwt = require("jsonwebtoken");
-
+const { generateWalletForUser } = require('../utils/walletGenerator');
 
 let codes = {}; 
 exports.sendEmail = async (req, res) => {
@@ -52,35 +52,105 @@ exports.sendEmail = async (req, res) => {
 
 
 
+
+
+
+const DEFAULT_REFERRAL_CODE = "Mmt3x";
+const { v4: uuidv4 } = require("uuid");
+const auth = require("../middleware/auth");
+
+function generateReferralCode() {
+  return Math.random().toString(36).substring(2, 8).toUpperCase();
+}
+
 exports.register = async (req, res) => {
-  const { phone, countryCode, email, code, loginPassword, transactionPassword, referralCode } = req.body;
-
-  const saved = codes[email];
-
-  if (!saved || saved.code !== parseInt(code)) {
-    return res.status(400).json({ message: "Invalid verification code." });
-  }
-
-  if (Date.now() > saved.expiresAt) {
-    delete codes[email];
-    return res.status(400).json({ message: "Verification code expired. Please request a new one." });
-  }
+  const {
+    phone,
+    countryCode,
+    email,
+    code,
+    loginPassword,
+    transactionPassword,
+    referralCode,
+  } = req.body;
 
   try {
+    // Step 1: Basic validations
+    if (!referralCode) {
+      return res.status(400).json({ message: "Referral code is required." });
+    }
+
+    const existingUser = await User.findOne({ email });
+    if (existingUser) {
+      return res.status(400).json({ message: "Email is already registered." });
+    }
+
+    const saved = codes[email];
+    if (!saved || saved.code !== parseInt(code)) {
+      return res.status(400).json({ message: "Invalid verification code." });
+    }
+
+    if (Date.now() > saved.expiresAt) {
+      delete codes[email];
+      return res.status(400).json({ message: "Verification code expired." });
+    }
+
+    // Step 2: Set up referrer/uplines
+    let referrerA = null;
+    let uplineB = null;
+    let uplineC = null;
+
+    if (referralCode === DEFAULT_REFERRAL_CODE) {
+      const existingAdminReferrer = await User.findOne({ referralCode: DEFAULT_REFERRAL_CODE });
+      if (!existingAdminReferrer) {
+        // Allow first user to register using default code
+        referrerA = null;
+      } else {
+        referrerA = existingAdminReferrer;
+        uplineB = referrerA.uplineA || null;
+        uplineC = referrerA.uplineB || null;
+      }
+    } else {
+      referrerA = await User.findOne({ referralCode });
+      if (!referrerA) {
+        return res.status(400).json({ message: "Invalid referral code." });
+      }
+      uplineB = referrerA.uplineA || null;
+      uplineC = referrerA.uplineB || null;
+    }
+
+    // Step 3: Create user
     const newUser = new User({
       phone,
       countryCode,
       email,
       loginPassword,
       transactionPassword,
-      referralCode,
+      userId: Math.floor(100000 + Math.random() * 900000).toString(),
+      referralCode: generateReferralCode(),
+
+      referredBy: referrerA?._id || null,
+      uplineA: referrerA?._id || null,
+      uplineB,
+      uplineC,
     });
 
     await newUser.save();
+
+    // Step 4: Update referrer’s referrals
+    if (referrerA) {
+      referrerA.referrals.push(newUser._id);
+      await referrerA.save();
+    }
+
+    // Step 5: Generate wallets
+    await generateWalletForUser(newUser._id);
+
+    // Step 6: Clear OTP and respond
     delete codes[email];
     res.json({ message: "User registered successfully." });
   } catch (err) {
-    console.error(err);
+    console.error("Registration Error:", err);
     res.status(500).json({ message: "Registration failed." });
   }
 };
@@ -102,7 +172,7 @@ exports.login = async (req, res) => {
     const token = jwt.sign(
       { id: user._id, email: user.email },
       process.env.JWT_SECRET || "your_secret_key",
-      { expiresIn: "2h" }
+      { expiresIn: "7d" }
     );
 
     return res.status(200).json({
@@ -212,14 +282,14 @@ exports.changeLoginPassword = async (req, res) => {
     return res.status(400).json({ message: "Missing required fields." });
   }
 
-  const savedCode = codes[email];
+  const savedCode = resetCodes[email];
 
   if (!savedCode || savedCode.code !== parseInt(code)) {
     return res.status(400).json({ message: "Invalid verification code." });
   }
 
   if (Date.now() > savedCode.expiresAt) {
-    delete codes[email];
+    delete resetCodes[email];
     return res.status(400).json({ message: "Verification code expired." });
   }
 
@@ -231,11 +301,121 @@ exports.changeLoginPassword = async (req, res) => {
     user.loginPassword = newPassword;
     await user.save();
 
-    delete codes[email];
+    delete resetCodes[email];
 
     return res.status(200).json({ message: "Login password updated successfully." });
   } catch (err) {
     console.error("Change password error:", err);
     return res.status(500).json({ message: "Server error while updating password." });
+  }
+};
+
+exports.sendWithdrawalCode = async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    if (!email) return res.status(400).json({ message: "Email is required" });
+
+    const user = await User.findOne({ email });
+    if (!user) return res.status(404).json({ message: "User not found" });
+
+    const code = Math.floor(100000 + Math.random() * 900000).toString();
+    user.withdrawalCode = code;
+    user.withdrawalCodeExpiry = Date.now() + 90 * 1000; // 🕒 90 seconds
+    await user.save();
+
+    const transporter = nodemailer.createTransport({
+      service: "Gmail",
+      auth: {
+         user: "contact@mmt3x.xyz",
+      pass: "Mmt3x@15432",
+      },
+    });
+
+    await transporter.sendMail({
+      from: '"Mmt3x" <your@gmail.com>',
+      to: email,
+      subject: "Withdrawal Password Reset Code",
+      text: `Your code is: ${code}`,
+    });
+
+    return res.json({ message: "Verification code sent to email." });
+  } catch (err) {
+    return res.status(500).json({ message: "Server error", error: err.message });
+  }
+};
+
+exports.updateUser = async (req, res) => {
+  const userId = req.user.id;
+  const { name, email, telegram, whatsapp, code } = req.body;
+
+  try {
+    // Step 1: Verify code
+    const record = codes[email];
+    if (!record || record.code != code || record.expiresAt < Date.now()) {
+      return res.status(400).json({ message: "Invalid or expired verification code" });
+    }
+
+    // Step 2: Update user
+    const user = await User.findById(userId);
+    if (!user) return res.status(404).json({ message: "User not found" });
+
+    user.name = name || user.name;
+    user.email = email || user.email;
+    user.telegram = telegram || user.telegram;
+    user.whatsapp = whatsapp || user.whatsapp;
+
+    await user.save();
+
+    // Step 3: Cleanup
+    delete codes[email];
+
+    res.status(200).json({ message: "Profile updated successfully", user });
+  } catch (err) {
+    console.error("Update error:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+exports.changeWithdrawalPassword = async (req, res) => {
+  try {
+    const { email, code, newPassword } = req.body;
+
+    if (!email || !code || !newPassword)
+      return res.status(400).json({ message: "All fields are required" });
+
+    const user = await User.findOne({ email });
+    if (!user || user.withdrawalCode !== code)
+      return res.status(400).json({ message: "Invalid code or email" });
+
+    if (Date.now() > user.withdrawalCodeExpiry)
+      return res.status(400).json({ message: "Code expired" });
+
+
+    user.withdrawalPassword = newPassword;
+    user.withdrawalCode = null;
+    user.withdrawalCodeExpiry = null;
+
+    await user.save();
+
+    return res.json({ message: "Withdrawal password updated successfully." });
+  } catch (err) {
+    return res.status(500).json({ message: "Server error", error: err.message });
+  }
+};
+
+exports.getUsers = async (req, res) => {
+  try {
+    const user = await User.findById(req.params.id);
+
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    // Only return necessary user info
+    res.json({user});
+  } catch (error) {
+    console.error('Error fetching user:', error);
+    res.status(500).json({ message: 'Server error' });
   }
 };
