@@ -31,4 +31,13 @@ router.post('/user/withdraw', async (req, res) => {
   res.status(201).json({ message: 'Withdrawal request submitted', withdrawal });
 });
 
+router.get("/getwithdraw",async (req, res) => {
+  try {
+    const withdrawals = await WithdrawalRequest.find().populate("user", "name email userId");
+    res.json(withdrawals);
+  } catch (err) {
+    res.status(500).json({ error: "Server error" });
+  }
+})
+
 module.exports = router;

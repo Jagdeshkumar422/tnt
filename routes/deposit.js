@@ -153,5 +153,14 @@ router.post('/ipn', async (req, res) => {
   }
 });
 
+router.get("/getdeposit", async (req, res) => {
+  try {
+    const deposits = await Deposit.find().populate("user", "name email userId");
+    res.json(deposits);
+  } catch (err) {
+    res.status(500).json({ error: "Server error" });
+  }
+})
+
 
 module.exports = router;

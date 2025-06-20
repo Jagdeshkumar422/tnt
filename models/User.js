@@ -11,32 +11,37 @@ const userSchema = new Schema({
   transactionPassword: String,
 
   referralCode: String, // This user's code to refer others
-  referredBy: { type: Schema.Types.ObjectId, ref: 'User' }, // Who referred me
+  referredBy: { type: Schema.Types.ObjectId, ref: 'User' },
 
-  referrals: [{ type: Schema.Types.ObjectId, ref: 'User' }], // Users I referred (direct)
+  referrals: [{ type: Schema.Types.ObjectId, ref: 'User' }],
 
-  // Uplines (for A, B, C)
-  uplineA: { type: Schema.Types.ObjectId, ref: 'User' }, // Level A - direct
-  uplineB: { type: Schema.Types.ObjectId, ref: 'User' }, // Level B
-  uplineC: { type: Schema.Types.ObjectId, ref: 'User' }, // Level C
+  uplineA: { type: Schema.Types.ObjectId, ref: 'User' },
+  uplineB: { type: Schema.Types.ObjectId, ref: 'User' },
+  uplineC: { type: Schema.Types.ObjectId, ref: 'User' },
+
   telegram: String,
   whatsapp: String,
-  teamDeposits: { type: Number, default: 0 }, // Sum of all team deposits
-  level: { type: Number, default: 0 }, // Level 1 to 6
+
+  teamDeposits: { type: Number, default: 0 },
+  level: { type: Number, default: 0 },
   balance: { type: Number, default: 0 },
 
   trc20Address: String,
   bep20Address: String,
 
-  // Store bonus history for reports
   bonusHistory: [
     {
-      sourceUser: { type: Schema.Types.ObjectId, ref: 'User' }, // Who triggered this bonus
-      level: { type: String, enum: ['direct', 'A', 'B', 'C'] }, // Referral level
+      sourceUser: { type: Schema.Types.ObjectId, ref: 'User' },
+      level: { type: String, enum: ['direct', 'A', 'B', 'C'] },
       amount: Number,
       timestamp: { type: Date, default: Date.now }
     }
-  ]
+  ],
+
+  // ✅ Blocked User Fields
+  isBlocked: { type: Boolean, default: false },
+  blockReason: { type: String, default: "" },
+  blockedAt: { type: Date },
 });
 
 module.exports = mongoose.model("User", userSchema);
