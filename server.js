@@ -8,6 +8,8 @@ const withdrawRoute = require("./routes/withdrawalRoute")
 const reservationRoute = require("./routes/reservationRoute")
 const nftRoute = require("./routes/nftRoute")
 const bonusRoute = require("./routes/bonusRoute")
+const adminRoute = require("./routes/adminRoute")
+const adminAuthRoute = require("./routes/adminAuth")
 
 require("dotenv").config();
 
@@ -31,6 +33,12 @@ app.use('/api', withdrawRoute);
 app.use('/api', reservationRoute);
 app.use('/api', nftRoute);
 app.use('/api', bonusRoute);
+app.use('/api/admin', adminRoute);
+app.use('/api/admin', adminAuthRoute);
+
+
+
+
 
 
 const PORT = process.env.PORT || 5000;
