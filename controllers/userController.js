@@ -460,3 +460,24 @@ exports.toggleBlockUser = async (req, res) => {
     res.status(500).json({ message: "Server error", error: err.message });
   }
 };
+
+exports.updateProfilePic = async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ message: "Image file is required" });
+    }
+
+    const imageUrl = req.file.path; // Cloudinary URL provided by multer-storage-cloudinary
+    console.log(imageUrl)
+
+    // Update user profile pic URL in DB
+    const userId = req.user._id; // or however you get user id
+    console.log(userId)
+    const user = await User.findByIdAndUpdate(userId, { profilePic: imageUrl }, { new: true });
+
+    res.json({ message: "Profile pic updated", user });
+  } catch (error) {
+    console.error("Error uploading profile pic:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+};

@@ -1,7 +1,8 @@
 const express = require("express");
-const { sendEmail, register, login, sendResetCode, resetPassword, changeLoginPassword, sendWithdrawalCode, changeWithdrawalPassword, getUsers, updateUser, toggleBlockUser } = require("../controllers/userController");
+const { sendEmail, register, login, sendResetCode, resetPassword, changeLoginPassword, sendWithdrawalCode, changeWithdrawalPassword, getUsers, updateUser, toggleBlockUser, updateProfilePic } = require("../controllers/userController");
 const auth = require("../middleware/auth");
 const router = require("express").Router(); 
+const upload = require("../middleware/upload")
 
 
 router.post("/send-code", sendEmail );
@@ -20,6 +21,7 @@ router.post("/change-withdrawal-password", changeWithdrawalPassword);
 
 // PUT /api/user/update
 router.put('/user/update', auth, updateUser);
+router.post('/update-profile-pic', auth, upload.single('image'), updateProfilePic);
 
 
 module.exports = router;

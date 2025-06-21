@@ -10,6 +10,10 @@ const userSchema = new Schema({
   loginPassword: String,
   transactionPassword: String,
 
+  profilePic: {
+  type: String, // store image URL or path
+  default: "https://res.cloudinary.com/di0qbhv97/image/upload/v1750513672/tpxvny1fbdv61_1_tamxgh.png"   // optional default placeholder
+},
   referralCode: String, // This user's code to refer others
   referredBy: { type: Schema.Types.ObjectId, ref: 'User' },
 
