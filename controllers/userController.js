@@ -39,7 +39,7 @@ exports.sendEmail = async (req, res) => {
     await transporter.sendMail({
       from: '"Mmt3x" <contact@mmt3x.xyz>',
       to: email,
-      subject: 'Email Verification Code from Treasure',
+      subject: 'Email Verification Code from Mmt3x',
       html: htmlTemplate,
     });
 
