@@ -310,40 +310,7 @@ exports.changeLoginPassword = async (req, res) => {
   }
 };
 
-exports.sendWithdrawalCode = async (req, res) => {
-  try {
-    const { email } = req.body;
 
-    if (!email) return res.status(400).json({ message: "Email is required" });
-
-    const user = await User.findOne({ email });
-    if (!user) return res.status(404).json({ message: "User not found" });
-
-    const code = Math.floor(100000 + Math.random() * 900000).toString();
-    user.withdrawalCode = code;
-    user.withdrawalCodeExpiry = Date.now() + 90 * 1000; // 🕒 90 seconds
-    await user.save();
-
-    const transporter = nodemailer.createTransport({
-      service: "Gmail",
-      auth: {
-         user: "contact@mmt3x.xyz",
-      pass: "Mmt3x@15432",
-      },
-    });
-
-    await transporter.sendMail({
-      from: '"Mmt3x" <your@gmail.com>',
-      to: email,
-      subject: "Withdrawal Password Reset Code",
-      text: `Your code is: ${code}`,
-    });
-
-    return res.json({ message: "Verification code sent to email." });
-  } catch (err) {
-    return res.status(500).json({ message: "Server error", error: err.message });
-  }
-};
 
 exports.updateUser = async (req, res) => {
   const userId = req.user.id;
@@ -375,7 +342,51 @@ exports.updateUser = async (req, res) => {
     console.error("Update error:", err);
     res.status(500).json({ message: "Server error" });
   }
+
 };
+
+const verificationCodes = {};
+
+exports.sendWithdrawalCode = async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    if (!email) return res.status(400).json({ message: "Email is required" });
+
+    const user = await User.findOne({ email });
+    if (!user) return res.status(404).json({ message: "User not found" });
+
+    const code = Math.floor(100000 + Math.random() * 900000).toString();
+
+    // Save code temporarily (in-memory)
+    verificationCodes[email] = {
+      code,
+      expiry: Date.now() + 90 * 1000, // 90 seconds
+    };
+
+    const transporter = nodemailer.createTransport({
+      host: 'smtp.hostinger.com',
+      port: 465,
+      secure: true,
+      auth: {
+        user: 'contact@mmt3x.xyz',
+        pass: 'Mmt3x@15432',
+      },
+    });
+
+    await transporter.sendMail({
+      from: '"Mmt3x" <contact@mmt3x.xyz>',
+      to: email,
+      subject: "Withdrawal Password Reset Code",
+      text: `Your verification code is: ${code}`,
+    });
+
+    return res.json({ message: "Verification code sent to email." });
+  } catch (err) {
+    return res.status(500).json({ message: "Server error", error: err.message });
+  }
+};
+
 
 exports.changeWithdrawalPassword = async (req, res) => {
   try {
@@ -385,17 +396,24 @@ exports.changeWithdrawalPassword = async (req, res) => {
       return res.status(400).json({ message: "All fields are required" });
 
     const user = await User.findOne({ email });
-    if (!user || user.withdrawalCode !== code)
-      return res.status(400).json({ message: "Invalid code or email" });
+    if (!user) return res.status(404).json({ message: "User not found" });
 
-    if (Date.now() > user.withdrawalCodeExpiry)
-      return res.status(400).json({ message: "Code expired" });
+    const entry = verificationCodes[email];
 
+    if (
+      !entry ||
+      entry.code !== code ||
+      Date.now() > entry.expiry
+    ) {
+      return res.status(400).json({ message: "Invalid or expired code" });
+    }
 
+    // Clear code after use
+    delete verificationCodes[email];
+
+    // Hash and update withdrawal password
+  
     user.withdrawalPassword = newPassword;
-    user.withdrawalCode = null;
-    user.withdrawalCodeExpiry = null;
-
     await user.save();
 
     return res.json({ message: "Withdrawal password updated successfully." });
@@ -403,7 +421,6 @@ exports.changeWithdrawalPassword = async (req, res) => {
     return res.status(500).json({ message: "Server error", error: err.message });
   }
 };
-
 exports.getUsers = async (req, res) => {
   try {
     const user = await User.findById(req.params.id);
