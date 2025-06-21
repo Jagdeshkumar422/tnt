@@ -1,44 +1,81 @@
 const express = require('express');
 const router = express.Router();
 const WalletBinding = require('../models/WalletBind');
+const nodemailer = require('nodemailer');
+const addressOtpStore = {};
+const User = require("../models/User")
 
+router.post('/user/send-address-code', async (req, res) => {
+  const { email } = req.body;
+
+  if (!email) return res.status(400).json({ message: 'Email is required' });
+
+  const user = await User.findOne({ email });
+  if (!user) return res.status(404).json({ message: 'User not found' });
+
+  const code = Math.floor(100000 + Math.random() * 900000).toString();
+  const expiresAt = Date.now() + 90 * 1000;
+
+  // Save to in-memory store
+  addressOtpStore[email] = { code, expiresAt };
+
+ const transporter = nodemailer.createTransport({
+     host: 'smtp.hostinger.com',
+     port: 465,
+     secure: true,
+     auth: {
+       user: 'contact@mmt3x.xyz',
+       pass: 'Mmt3x@15432',
+     },
+   });
+
+  await transporter.sendMail({
+    from: '"Mmt3x" <contact@mmt3x.xyz>',
+    to: email,
+    subject: 'Change Address Verification Code',
+    text: `Your code is: ${code}`,
+  });
+
+  res.json({ message: 'Verification code sent to email.' });
+});
 // POST: Create or Update Wallet Binding
 router.post('/user/bind-wallet', async (req, res) => {
-  const { userId, trc20Address, bep20Address } = req.body;
+  const { userId, bep20Address, code, email } = req.body;
 
-  if (!userId) {
-    return res.status(400).json({ message: 'User ID is required' });
-  }
+  if (!userId || !bep20Address || !code || !email)
+    return res.status(400).json({ message: 'All fields are required' });
 
-  if (!trc20Address && !bep20Address) {
-    return res.status(400).json({ message: 'At least one wallet address (TRC20 or BEP20) must be provided' });
-  }
+  const user = await User.findOne({ _id: userId, email });
+  if (!user) return res.status(404).json({ message: 'User not found' });
 
-  try {
-    let binding = await WalletBinding.findOne({ userId });
+  const otpEntry = addressOtpStore[email];
 
-    if (binding) {
-      // Update only the field(s) that were sent
-      if (trc20Address) binding.trc20Address = trc20Address;
-      if (bep20Address) binding.bep20Address = bep20Address;
+  if (!otpEntry || otpEntry.code !== code)
+    return res.status(400).json({ message: 'Invalid or expired code' });
 
-      await binding.save();
-      return res.status(200).json({ message: 'Wallet updated successfully', binding });
-    } else {
-      // Create new record with whichever field is present
-      const newBind = await WalletBinding.create({
-        userId,
-        trc20Address: trc20Address || '',
-        bep20Address: bep20Address || '',
-      });
+  if (Date.now() > otpEntry.expiresAt)
+    return res.status(400).json({ message: 'Code expired' });
 
-      return res.status(201).json({ message: 'Wallet bound successfully', binding: newBind });
-    }
-  } catch (err) {
-    console.error('Error binding wallet:', err);
-    return res.status(500).json({ message: 'Server error' });
+  // Clear OTP after use
+  delete addressOtpStore[email];
+
+  // Proceed to update address
+  let binding = await WalletBinding.findOne({ userId });
+
+  if (binding) {
+    binding.bep20Address = bep20Address;
+    await binding.save();
+    return res.json({ message: 'Address updated', binding });
+  } else {
+    const newBind = await WalletBinding.create({
+      userId,
+      bep20Address,
+      trc20Address: '',
+    });
+    return res.status(201).json({ message: 'Address bound', binding: newBind });
   }
 });
+
 
 
 // GET: Retrieve Wallet Binding by User ID
