@@ -468,16 +468,41 @@ exports.updateProfilePic = async (req, res) => {
     }
 
     const imageUrl = req.file.path; // Cloudinary URL provided by multer-storage-cloudinary
-    console.log(imageUrl)
 
     // Update user profile pic URL in DB
     const userId = req.user._id; // or however you get user id
-    console.log(userId)
+
     const user = await User.findByIdAndUpdate(userId, { profilePic: imageUrl }, { new: true });
 
     res.json({ message: "Profile pic updated", user });
   } catch (error) {
     console.error("Error uploading profile pic:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+
+exports.updateUserLevel = async (req, res) => {
+  try {
+    const { userId, level } = req.body;
+
+    if (typeof level !== 'number' || level < 0 || level > 6) {
+      return res.status(400).json({ message: "Level must be between 0 and 6" });
+    }
+
+    const user = await User.findByIdAndUpdate(
+      userId,
+      { level },
+      { new: true }
+    );
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    res.json({ message: "User level updated successfully", user });
+  } catch (error) {
+    console.error("Error updating user level:", error);
     res.status(500).json({ message: "Server error" });
   }
 };
