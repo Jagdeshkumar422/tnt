@@ -94,79 +94,42 @@ exports.getUserBonusSummary = async (req, res) => {
 
 
 exports.getTeamLevels = async (req, res) => {
-  try {
-    const userId = req.user.id; // Current user (the root of downline)
+ try {
+    const userId = req.user.id;
 
-    // Initialize arrays for levels 1–6
-    const levelUsers = Array(7).fill().map(() => []); // Index 1–6 used
-
-    // Fetch all users referred directly or indirectly (up to 6 levels deep)
-    let currentLevelIds = [userId];
-    for (let level = 1; level <= 6; level++) {
-      if (currentLevelIds.length === 0) break;
-
-      // Find users whose uplineA is in the current level's IDs
-      const users = await User.find({ uplineA: { $in: currentLevelIds } }).select(
-        '_id userId level uplineA'
-      );
-
-      // Group users by their 'level' field
-      users.forEach((user) => {
-        const userLevel = user.level || level; // Fallback to computed level if 'level' is missing
-        if (userLevel >= 1 && userLevel <= 6) {
-          levelUsers[userLevel].push(user);
-        }
-      });
-
-      // Prepare IDs for the next level
-      currentLevelIds = users.map((u) => u._id);
+    if (!mongoose.Types.ObjectId.isValid(userId)) {
+      return res.status(400).json({ message: "Invalid user ID" });
     }
 
-    // Format each level's data
-    const levelData = await Promise.all(
-      levelUsers.slice(1).map(async (users, idx) => {
-        const level = idx + 1;
-        const userCount = users.length;
+    // Find team members where this user is Upline A, B, or C
+    const [level1Users, level2Users, level3Users] = await Promise.all([
+      User.find({ uplineA: userId }).select("userId name email balance"),
+      User.find({ uplineB: userId }).select("userId name email balance"),
+      User.find({ uplineC: userId }).select("userId name email balance"),
+    ]);
 
-        // Get user details and bonuses for this level
-        const userDetails = await Promise.all(
-          users.map(async (user) => {
-            // Get total bonuses earned from this specific user
-            const bonuses = await BonusHistory.aggregate([
-              {
-                $match: {
-                  userId: userId, // Bonus earned by this user
-                  sourceUserId: user._id, // From this specific user
-                  level: level,
-                },
-              },
-              {
-                $group: {
-                  _id: null,
-                  total: { $sum: '$amount' },
-                },
-              },
-            ]);
+    const result = [
+      {
+        level: 1,
+        count: level1Users.length,
+        users: level1Users,
+      },
+      {
+        level: 2,
+        count: level2Users.length,
+        users: level2Users,
+      },
+      {
+        level: 3,
+        count: level3Users.length,
+        users: level3Users,
+      },
+    ];
 
-            return {
-              userId: user._id || user._id.toString(), // Use userId or _id
-              profit: bonuses[0]?.total.toFixed(3) || '0.000',
-            };
-          })
-        );
-
-        return {
-          level,
-          count: userCount,
-          users: userDetails, // Array of users with their details
-        };
-      })
-    );
-
-    res.status(200).json(levelData);
-  } catch (err) {
-    console.error('Error fetching team levels:', err);
-    res.status(500).json({ error: 'Failed to fetch team data' });
+    return res.status(200).json(result);
+  } catch (error) {
+    console.error("❌ Failed to get team members:", error);
+    return res.status(500).json({ message: "Server error" });
   }
 };
 
