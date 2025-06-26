@@ -19,7 +19,7 @@ router.post('/deposit/create-deposit', async (req, res) => {
     }
 
     // ✅ Step 2: Validate supported currencies
-    const supportedCurrencies = ['bnbusdt', 'usdttrc20']; // add more if needed
+    const supportedCurrencies = ['usdttrc20', 'usdtbsc', 'bnbbsc', 'busdbsc']; // add more if needed
     if (!supportedCurrencies.includes(currency)) {
       return res.status(400).json({
         success: false,
