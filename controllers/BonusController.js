@@ -94,59 +94,29 @@ exports.getUserBonusSummary = async (req, res) => {
 
 
 exports.getTeamLevels = async (req, res) => {
-    try {
+     try {
     const userId = req.user.id || req.user._id;
 
-    // ✅ Validate userId
     if (!mongoose.Types.ObjectId.isValid(userId)) {
       return res.status(400).json({ message: "Invalid user ID" });
     }
 
-    // ✅ Find the user and populate upline references
-    const user = await User.findById(userId)
-      .populate("uplineA", "userId name email level")
-      .populate("uplineB", "userId name email level")
-      .populate("uplineC", "userId name email level");
+    const [uplineAUsers, uplineBUsers, uplineCUsers] = await Promise.all([
+      User.find({ uplineA: userId }).select("userId name email level"),
+      User.find({ uplineB: userId }).select("userId name email level"),
+      User.find({ uplineC: userId }).select("userId name email level"),
+    ]);
 
-    if (!user) {
-      return res.status(404).json({ message: "User not found" });
-    }
-
-    // ✅ Return populated uplines
-    const uplines = {
-      uplineA: user.uplineA
-        ? {
-            _id: user.uplineA._id,
-            userId: user.uplineA.userId,
-            name: user.uplineA.name,
-            email: user.uplineA.email,
-            level: user.uplineA.level,
-          }
-        : null,
-      uplineB: user.uplineB
-        ? {
-            _id: user.uplineB._id,
-            userId: user.uplineB.userId,
-            name: user.uplineB.name,
-            email: user.uplineB.email,
-            level: user.uplineB.level,
-          }
-        : null,
-      uplineC: user.uplineC
-        ? {
-            _id: user.uplineC._id,
-            userId: user.uplineC.userId,
-            name: user.uplineC.name,
-            email: user.uplineC.email,
-            level: user.uplineC.level,
-          }
-        : null,
-    };
-
-    return res.status(200).json({ success: true, uplines });
+    res.status(200).json({
+      success: true,
+      message: "Downline users fetched successfully",
+      uplineA: uplineAUsers,
+      uplineB: uplineBUsers,
+      uplineC: uplineCUsers,
+    });
 
   } catch (err) {
-    console.error("❌ Error in getTeamUplines:", err);
-    return res.status(500).json({ success: false, error: "Internal Server Error" });
+    console.error("❌ Error fetching downlines:", err);
+    res.status(500).json({ success: false, error: "Server error" });
   }
 };
