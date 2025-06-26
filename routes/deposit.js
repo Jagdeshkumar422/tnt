@@ -3,7 +3,8 @@ const router = express.Router();
 const { createPayment } = require('../config/nowpayment');
 const Deposit = require('../models/Deposit');
 const User = require('../models/User');
-const updateUserLevel = require("../utils/updateUserLevel")
+const BonusHistory = require('../models/BonusHistory');
+const updateUserLevel = require("../utils/updateUserLevel");
 
 // STEP 1: Create Deposit
 router.post('/create-deposit', async (req, res) => {
@@ -13,7 +14,7 @@ router.post('/create-deposit', async (req, res) => {
     const paymentData = {
       price_amount: amount,
       price_currency: 'usd',
-      pay_currency: currency, // e.g. usdttrc20 or usdtbep20
+      pay_currency: currency,
       ipn_callback_url: `https://api.treasurenftx.xyz/api/deposit/ipn`,
       order_id: `order-${Date.now()}-${userId}`,
     };
@@ -36,111 +37,103 @@ router.post('/create-deposit', async (req, res) => {
       paymentId: payment.payment_id,
     });
   } catch (err) {
-    console.error('Create Deposit Error:', err?.response?.data || err);
+    console.error('Create Deposit Error:', err?.response?.data || err.message || err);
     res.status(500).json({ success: false, message: 'Deposit failed.' });
   }
 });
 
-// STEP 2: Handle NowPayments webhook (IPN)
-// routes/deposit.js
-const BonusHistory = require('../models/BonusHistory'); // make sure this is imported
-
+// STEP 2: Handle NowPayments IPN
 router.post('/ipn', async (req, res) => {
   try {
-    const { payment_id, payment_status, pay_address, price_amount } = req.body;
+    const body = JSON.parse(req.body.toString()); // Because we used express.raw()
+    console.log("IPN Received:", body);
+
+    const { payment_id, payment_status, price_amount } = body;
 
     const deposit = await Deposit.findOne({ paymentId: payment_id });
-    if (!deposit) return res.status(404).end();
+    if (!deposit) return res.status(404).send("Deposit not found");
 
-    if (deposit.status === 'finished') return res.status(200).end();
+    if (deposit.status === 'finished') return res.status(200).end(); // Already processed
 
     if (payment_status === 'finished') {
       deposit.status = 'finished';
 
-      // STEP 1: Add balance to depositor
       const user = await User.findById(deposit.userId);
-      if (!user) return res.status(404).end();
+      if (!user) return res.status(404).send("User not found");
 
-      user.balance += price_amount;
+      const amount = parseFloat(price_amount);
+      user.balance += amount;
 
-      // STEP 2: Direct Referral Bonus (10%)
+      // Direct Referral Bonus (10%)
       if (user.referredBy) {
         const referrer = await User.findById(user.referredBy);
         if (referrer) {
-          const bonus = price_amount * 0.10;
+          const bonus = amount * 0.10;
           referrer.balance += bonus;
-          referrer.teamDeposits = (referrer.teamDeposits || 0) + price_amount;
-
+          referrer.teamDeposits = (referrer.teamDeposits || 0) + amount;
           await referrer.save();
 
-          // Save Bonus History
           await BonusHistory.create({
             userId: referrer._id,
             sourceUserId: user._id,
             amount: bonus,
             type: 'referral',
-            level: 1
+            level: 1,
           });
         }
       }
 
-      // STEP 3: Team Commission (15% A, 10% B, 5% C)
+      // Team Commission (Level A, B, C)
       const levelA = user.referredBy && await User.findById(user.referredBy);
       const levelB = levelA?.referredBy && await User.findById(levelA.referredBy);
       const levelC = levelB?.referredBy && await User.findById(levelB.referredBy);
 
       if (levelA) {
-        const bonusA = price_amount * 0.15;
+        const bonusA = amount * 0.15;
         levelA.balance += bonusA;
-        levelA.teamDeposits = (levelA.teamDeposits || 0) + price_amount;
+        levelA.teamDeposits = (levelA.teamDeposits || 0) + amount;
         await levelA.save();
-
         await BonusHistory.create({
           userId: levelA._id,
           sourceUserId: user._id,
           amount: bonusA,
           type: 'team',
-          level: 2
+          level: 2,
         });
       }
 
       if (levelB) {
-        const bonusB = price_amount * 0.10;
+        const bonusB = amount * 0.10;
         levelB.balance += bonusB;
-        levelB.teamDeposits = (levelB.teamDeposits || 0) + price_amount;
+        levelB.teamDeposits = (levelB.teamDeposits || 0) + amount;
         await levelB.save();
-
         await BonusHistory.create({
           userId: levelB._id,
           sourceUserId: user._id,
           amount: bonusB,
           type: 'team',
-          level: 3
+          level: 3,
         });
       }
 
       if (levelC) {
-        const bonusC = price_amount * 0.05;
+        const bonusC = amount * 0.05;
         levelC.balance += bonusC;
-        levelC.teamDeposits = (levelC.teamDeposits || 0) + price_amount;
+        levelC.teamDeposits = (levelC.teamDeposits || 0) + amount;
         await levelC.save();
-
         await BonusHistory.create({
           userId: levelC._id,
           sourceUserId: user._id,
           amount: bonusC,
           type: 'team',
-          level: 4
+          level: 4,
         });
       }
 
-      // STEP 4: Update depositor
       await user.save();
-
-      // STEP 5: Optional Level-Up Logic
-      await updateUserLevel(user.referredBy);       // A
-      await updateUserLevel(levelA?.referredBy);     // B
-      await updateUserLevel(levelB?.referredBy);     // C
+      await updateUserLevel(user.referredBy);
+      await updateUserLevel(levelA?.referredBy);
+      await updateUserLevel(levelB?.referredBy);
     } else {
       deposit.status = payment_status;
     }
@@ -153,14 +146,14 @@ router.post('/ipn', async (req, res) => {
   }
 });
 
+// Get all deposits
 router.get("/getdeposit", async (req, res) => {
   try {
-    const deposits = await Deposit.find().populate("user", "name email userId");
+    const deposits = await Deposit.find().populate("userId", "name email userId");
     res.json(deposits);
   } catch (err) {
     res.status(500).json({ error: "Server error" });
   }
-})
-
+});
 
 module.exports = router;
