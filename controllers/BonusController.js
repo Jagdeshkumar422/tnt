@@ -93,9 +93,6 @@ exports.getUserBonusSummary = async (req, res) => {
 
 
 
-const mongoose = require("mongoose");
-const User = require("../models/User");
-
 exports.getTeamLevels = async (req, res) => {
   try {
     const userId = req.user.id || req.user._id;
