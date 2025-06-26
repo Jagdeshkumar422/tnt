@@ -6,7 +6,7 @@ const User = require('../models/User');
 const BonusHistory = require('../models/BonusHistory');
 const updateUserLevel = require("../utils/updateUserLevel");
 
-router.post('/create-deposit', async (req, res) => {
+router.post('/deposit/create-deposit', async (req, res) => {
   try {
     const { currency, userId } = req.body;
 
@@ -49,7 +49,7 @@ router.post('/create-deposit', async (req, res) => {
 
 // STEP 2: NowPayments IPN Handler
 // IPN Callback Handler
-router.post('/ipn', async (req, res) => {
+router.post('/deposit/ipn', async (req, res) => {
   try {
     const body = JSON.parse(req.body.toString('utf8'));
     const { payment_id, payment_status, price_amount } = body;
