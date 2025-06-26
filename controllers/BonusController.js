@@ -101,35 +101,33 @@ exports.getTeamLevels = async (req, res) => {
       return res.status(400).json({ message: "Invalid user ID" });
     }
 
-    // Find team members where this user is Upline A, B, or C
-    const [level1Users, level2Users, level3Users] = await Promise.all([
-      User.find({ uplineA: userId }).select("userId name email balance"),
-      User.find({ uplineB: userId }).select("userId name email balance"),
-      User.find({ uplineC: userId }).select("userId name email balance"),
-    ]);
+    // Fetch only users who were referred by YOU in A, B, or C
+    const level1 = await User.find({ uplineA: userId }).select("userId name email balance");
+    const level2 = await User.find({ uplineB: userId }).select("userId name email balance");
+    const level3 = await User.find({ uplineC: userId }).select("userId name email balance");
 
     const result = [
       {
         level: 1,
-        count: level1Users.length,
-        users: level1Users,
+        count: level1.length,
+        users: level1
       },
       {
         level: 2,
-        count: level2Users.length,
-        users: level2Users,
+        count: level2.length,
+        users: level2
       },
       {
         level: 3,
-        count: level3Users.length,
-        users: level3Users,
-      },
+        count: level3.length,
+        users: level3
+      }
     ];
 
     return res.status(200).json(result);
-  } catch (error) {
-    console.error("❌ Failed to get team members:", error);
-    return res.status(500).json({ message: "Server error" });
+  } catch (err) {
+    console.error("Error fetching referred users by upline levels:", err);
+    res.status(500).json({ message: "Server error" });
   }
 };
 
