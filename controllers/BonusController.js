@@ -95,49 +95,22 @@ exports.getUserBonusSummary = async (req, res) => {
 
 exports.getTeamLevels = async (req, res) => {
    try {
-    const userId = req.user.id;
+    const user = await User.findById(req.params.id)
+      .populate('uplineA', 'userId email -_id')
+      .populate('uplineB', 'userId email -_id')
+      .populate('uplineC', 'userId email -_id')
+      .populate('referredBy', 'userId email -_id')
+      .populate('referrals', 'userId email -_id')
+      .select('userId name email balance level referrals uplineA uplineB uplineC referredBy');
 
-    const user = await User.findById(userId)
-      .populate("uplineA", "userId name email level")
-      .populate("uplineB", "userId name email level")
-      .populate("uplineC", "userId name email level");
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
 
-    if (!user) return res.status(404).json({ message: "User not found" });
-
-    const uplines = {
-      A: user.uplineA
-        ? {
-            id: user.uplineA._id,
-            userId: user.uplineA.userId,
-            name: user.uplineA.name,
-            email: user.uplineA.email,
-            level: user.uplineA.level,
-          }
-        : null,
-      B: user.uplineB
-        ? {
-            id: user.uplineB._id,
-            userId: user.uplineB.userId,
-            name: user.uplineB.name,
-            email: user.uplineB.email,
-            level: user.uplineB.level,
-          }
-        : null,
-      C: user.uplineC
-        ? {
-            id: user.uplineC._id,
-            userId: user.uplineC.userId,
-            name: user.uplineC.name,
-            email: user.uplineC.email,
-            level: user.uplineC.level,
-          }
-        : null,
-    };
-
-    res.status(200).json({ uplines });
+    res.status(200).json({ success: true, user });
   } catch (err) {
-    console.error("Error fetching uplines:", err);
-    res.status(500).json({ error: "Failed to fetch uplines" });
+    console.error('❌ Error fetching user:', err);
+    res.status(500).json({ success: false, message: 'Server error' });
   }
 };
 
