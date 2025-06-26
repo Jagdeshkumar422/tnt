@@ -14,7 +14,7 @@ router.post('/create-deposit', async (req, res) => {
       price_amount: amount,
       price_currency: 'usd',
       pay_currency: currency, // e.g. usdttrc20 or usdtbep20
-      ipn_callback_url: `/deposit/ipn`,
+      ipn_callback_url: `https://api.treasurenftx.xyz/api/deposit/ipn`,
       order_id: `order-${Date.now()}-${userId}`,
     };
 
