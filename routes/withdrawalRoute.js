@@ -40,4 +40,31 @@ router.get("/getwithdraw",async (req, res) => {
   }
 })
 
+// Update withdrawal status (accept/reject)
+router.patch('/user/withdraw/:id/status', async (req, res) => {
+  const { id } = req.params;
+  const { status } = req.body; // Expected values: "accepted" or "rejected"
+
+  if (!['accepted', 'rejected'].includes(status)) {
+    return res.status(400).json({ message: 'Invalid status value' });
+  }
+
+  try {
+    const updatedWithdrawal = await WithdrawalRequest.findByIdAndUpdate(
+      id,
+      { status },
+      { new: true }
+    );
+
+    if (!updatedWithdrawal) {
+      return res.status(404).json({ message: 'Withdrawal request not found' });
+    }
+
+    res.json({ message: `Withdrawal ${status}`, withdrawal: updatedWithdrawal });
+  } catch (err) {
+    res.status(500).json({ message: 'Server error', error: err.message });
+  }
+});
+
+
 module.exports = router;
