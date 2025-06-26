@@ -40,24 +40,15 @@ router.post('/user/send-address-code', async (req, res) => {
 });
 // POST: Create or Update Wallet Binding
 router.post('/user/bind-wallet', async (req, res) => {
-  const { userId, bep20Address, code, email } = req.body;
+  const { userId, bep20Address } = req.body;
 
-  if (!userId || !bep20Address || !code || !email)
+  if (!userId || !bep20Address)
     return res.status(400).json({ message: 'All fields are required' });
 
-  const user = await User.findOne({ _id: userId, email });
+  const user = await User.findOne({ _id: userId });
   if (!user) return res.status(404).json({ message: 'User not found' });
 
-  const otpEntry = addressOtpStore[email];
 
-  if (!otpEntry || otpEntry.code !== code)
-    return res.status(400).json({ message: 'Invalid or expired code' });
-
-  if (Date.now() > otpEntry.expiresAt)
-    return res.status(400).json({ message: 'Code expired' });
-
-  // Clear OTP after use
-  delete addressOtpStore[email];
 
   // Proceed to update address
   let binding = await WalletBinding.findOne({ userId });
