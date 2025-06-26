@@ -6,7 +6,7 @@ const axios = require('axios');
 const NOWPAYMENTS_API_KEY = "XBFJZXA-77P4DVW-K91BPXY-HA9DNG7";
 
 const nowPaymentsClient = axios.create({
-  baseURL: 'https://api.sandbox.nowpayments.io/v1',
+  baseURL: 'https://api.nowpayments.io/v1',
   headers: {
     'x-api-key': NOWPAYMENTS_API_KEY,
     'Content-Type': 'application/json',
