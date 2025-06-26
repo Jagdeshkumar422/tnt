@@ -88,6 +88,7 @@ router.post('/deposit/create-deposit', async (req, res) => {
 });
 
 // ✅ Fixed IPN Handler
+// ✅ IPN Handler with Bonus Distribution
 router.post('/deposit/ipn', async (req, res) => {
   try {
     console.log('📩 Received IPN:', req.body);
@@ -105,13 +106,64 @@ router.post('/deposit/ipn', async (req, res) => {
       deposit.status = 'finished';
       deposit.amount = price_amount;
 
-      const user = await User.findById(deposit.userId);
+      const user = await User.findById(deposit.userId).populate('uplineA uplineB uplineC');
       if (!user) return res.status(404).send("User not found");
 
-      user.balance = (user.balance || 0) + parseFloat(price_amount);
-      await user.save();
+      const depositAmount = parseFloat(price_amount);
 
-      await updateUserLevel(user.referredBy); // optional
+      // ✅ 1. Add balance to user
+      user.balance = (user.balance || 0) + depositAmount;
+
+      // ✅ 2. First deposit bonus (10%)
+      const existingDeposits = await Deposit.find({ userId: user._id, status: 'finished' });
+      const isFirstDeposit = existingDeposits.length === 0;
+      if (isFirstDeposit) {
+        const selfBonus = depositAmount * 0.10;
+        user.balance += selfBonus;
+        user.bonusHistory.push({
+          sourceUser: user._id,
+          level: 'direct',
+          amount: selfBonus,
+        });
+      }
+
+      // ✅ 3. Upline A (15%)
+      if (user.uplineA) {
+        const bonusA = depositAmount * 0.15;
+        user.uplineA.balance = (user.uplineA.balance || 0) + bonusA;
+        user.uplineA.bonusHistory.push({
+          sourceUser: user._id,
+          level: 'A',
+          amount: bonusA,
+        });
+        await user.uplineA.save();
+      }
+
+      // ✅ 4. Upline B (10%)
+      if (user.uplineB) {
+        const bonusB = depositAmount * 0.10;
+        user.uplineB.balance = (user.uplineB.balance || 0) + bonusB;
+        user.uplineB.bonusHistory.push({
+          sourceUser: user._id,
+          level: 'B',
+          amount: bonusB,
+        });
+        await user.uplineB.save();
+      }
+
+      // ✅ 5. Upline C (5%)
+      if (user.uplineC) {
+        const bonusC = depositAmount * 0.05;
+        user.uplineC.balance = (user.uplineC.balance || 0) + bonusC;
+        user.uplineC.bonusHistory.push({
+          sourceUser: user._id,
+          level: 'C',
+          amount: bonusC,
+        });
+        await user.uplineC.save();
+      }
+
+      await user.save();
     } else {
       deposit.status = payment_status;
     }
@@ -123,6 +175,7 @@ router.post('/deposit/ipn', async (req, res) => {
     res.status(500).send('IPN handling failed');
   }
 });
+
 
 // Get all deposits (for admin/debug)
 router.get("/getdeposit", async (req, res) => {

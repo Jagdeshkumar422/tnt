@@ -48,4 +48,22 @@ const userSchema = new Schema({
   blockedAt: { type: Date },
 });
 
+userSchema.pre('save', async function (next) {
+  if (!this.isModified('balance')) return next(); // only if balance is updated
+
+  const balance = this.balance || 0;
+  const refCount = this.referrals?.length || 0;
+
+  if (balance >= 10001 && refCount >= 100) this.level = 7;
+  else if (balance >= 8001 && refCount >= 100) this.level = 6;
+  else if (balance >= 5001 && refCount >= 70) this.level = 5;
+  else if (balance >= 3001 && refCount >= 40) this.level = 4;
+  else if (balance >= 1001 && refCount >= 20) this.level = 3;
+  else if (balance >= 301 && refCount >= 5) this.level = 2;
+  else if (balance >= 47) this.level = 1;
+  else this.level = 0;
+
+  next();
+});
+
 module.exports = mongoose.model("User", userSchema);

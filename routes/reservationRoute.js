@@ -123,31 +123,46 @@ router.post('/sell', auth, async (req, res) => {
     if (!user) return res.status(404).json({ message: 'User not found' });
 
     const baseAmount = 48;
-    const levelBonus = LEVEL_BONUSES[user.level] || 0;
-    const sellerProfit = baseAmount * levelBonus;
 
-    // 💸 Add profit to user
+    // 🧮 Level-based profit rate
+    const levelRates = {
+      1: 0.025,
+      2: 0.027,
+      3: 0.029,
+      4: 0.032,
+      5: 0.035,
+      6: 0.039,
+      7: 0.045
+    };
+
+    const userLevel = user.level || 1;
+    const profitRate = levelRates[userLevel] || 0.025; // Default to 2.5% if not matched
+
+    const sellerProfit = baseAmount * profitRate;
+
+    // 💰 Add profit to user balance
     user.balance += sellerProfit;
     await user.save();
 
-    // ✍️ Save to BonusHistory (self reservation profit)
+    // 📘 Save user's bonus history
     await BonusHistory.create({
       userId: user._id,
       sourceUserId: user._id,
       amount: sellerProfit,
       type: 'reservation',
-      level: user.level || 1
+      level: userLevel
     });
 
+    // ✅ Mark reservation as sold
     reservation.sold = true;
     reservation.collected = false;
     await reservation.save();
 
-    // 👥 Team commission distribution (corrected to type: 'team')
+    // 👥 Upline commission distribution
     const uplines = [
       { id: user.uplineA, label: 'A', percent: 0.15, level: 1 },
       { id: user.uplineB, label: 'B', percent: 0.10, level: 2 },
-      { id: user.uplineC, label: 'C', percent: 0.07, level: 3 }
+      { id: user.uplineC, label: 'C', percent: 0.05, level: 3 }
     ];
 
     const referralLogs = [];
@@ -160,17 +175,16 @@ router.post('/sell', auth, async (req, res) => {
           upline.balance += teamBonus;
           await upline.save();
 
-          // 📝 Save to BonusHistory (as team revenue)
           await BonusHistory.create({
             userId: upline._id,
             sourceUserId: user._id,
             amount: teamBonus,
-            type: 'team', // ✅ correct type for team commission
+            type: 'team',
             level
           });
 
           referralLogs.push({
-            level,
+            level: label,
             email: upline.email,
             bonus: teamBonus.toFixed(2)
           });
@@ -180,6 +194,7 @@ router.post('/sell', auth, async (req, res) => {
 
     return res.json({
       message: 'NFT marked as sold. Revenue distributed.',
+      userLevel,
       sellerProfit: sellerProfit.toFixed(2),
       remainingBalance: user.balance.toFixed(2),
       teamBonuses: referralLogs
