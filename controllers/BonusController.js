@@ -93,16 +93,26 @@ exports.getUserBonusSummary = async (req, res) => {
 
 
 
+const mongoose = require("mongoose");
+const User = require("../models/User");
+
 exports.getTeamLevels = async (req, res) => {
-   try {
-    const userId = req.user.id;
+  try {
+    const userId = req.user.id || req.user._id;
+
+    // Ensure the userId is a valid ObjectId
+    if (!mongoose.Types.ObjectId.isValid(userId)) {
+      return res.status(400).json({ message: "Invalid user ID" });
+    }
 
     const user = await User.findById(userId)
       .populate("uplineA", "userId name email level")
       .populate("uplineB", "userId name email level")
       .populate("uplineC", "userId name email level");
 
-    if (!user) return res.status(404).json({ message: "User not found" });
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
 
     const uplines = {
       A: user.uplineA
@@ -134,10 +144,9 @@ exports.getTeamLevels = async (req, res) => {
         : null,
     };
 
-    res.status(200).json({ uplines });
+    return res.status(200).json({ uplines });
   } catch (err) {
-    console.error("Error fetching uplines:", err);
+    console.error("❌ Error fetching uplines:", err);
     res.status(500).json({ error: "Failed to fetch uplines" });
   }
 };
-
