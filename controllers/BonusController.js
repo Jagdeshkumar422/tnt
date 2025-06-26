@@ -94,29 +94,29 @@ exports.getUserBonusSummary = async (req, res) => {
 
 
 exports.getTeamLevels = async (req, res) => {
-     try {
+    try {
     const userId = req.user.id || req.user._id;
 
     if (!mongoose.Types.ObjectId.isValid(userId)) {
       return res.status(400).json({ message: "Invalid user ID" });
     }
 
-    const [uplineAUsers, uplineBUsers, uplineCUsers] = await Promise.all([
-      User.find({ uplineA: userId }).select("userId name email level"),
-      User.find({ uplineB: userId }).select("userId name email level"),
-      User.find({ uplineC: userId }).select("userId name email level"),
-    ]);
+    // Find users where current user is uplineA, B, or C
+    const teamA = await User.find({ uplineA: userId }).select("userId name email level");
+    const teamB = await User.find({ uplineB: userId }).select("userId name email level");
+    const teamC = await User.find({ uplineC: userId }).select("userId name email level");
 
-    res.status(200).json({
+    return res.status(200).json({
       success: true,
-      message: "Downline users fetched successfully",
-      uplineA: uplineAUsers,
-      uplineB: uplineBUsers,
-      uplineC: uplineCUsers,
+      message: "Team fetched successfully",
+      team: {
+        A: teamA,
+        B: teamB,
+        C: teamC
+      }
     });
-
-  } catch (err) {
-    console.error("❌ Error fetching downlines:", err);
-    res.status(500).json({ success: false, error: "Server error" });
+  } catch (error) {
+    console.error("❌ Error in getMyTeam:", error);
+    return res.status(500).json({ message: "Server error" });
   }
 };
