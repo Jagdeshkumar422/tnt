@@ -19,7 +19,7 @@ router.post('/deposit/create-deposit', async (req, res) => {
     }
 
     // ✅ Step 2: Validate supported currencies
-    const supportedCurrencies = ['usdttrc20', 'usdtbsc', 'bnbbsc', 'busdbsc']; // add more if needed
+    const supportedCurrencies = ['usdttrc20', 'usdtbsc', 'bnbbsc', 'busdbsc'];
     if (!supportedCurrencies.includes(currency)) {
       return res.status(400).json({
         success: false,
@@ -27,9 +27,26 @@ router.post('/deposit/create-deposit', async (req, res) => {
       });
     }
 
-    // ✅ Step 3: Build payment payload
+    // ✅ Step 3: Check if existing 'waiting' deposit exists for user + currency
+    const existingDeposit = await Deposit.findOne({
+      userId,
+      currency,
+      status: 'waiting',
+    });
+
+    if (existingDeposit) {
+      return res.json({
+        success: true,
+        address: existingDeposit.payAddress,
+        paymentId: existingDeposit.paymentId,
+        invoice_url: existingDeposit.invoice_url,
+        message: 'Existing deposit address reused',
+      });
+    }
+
+    // ✅ Step 4: Create new payment
     const paymentData = {
-      price_amount: 1, // temporary placeholder amount, final amount will be detected via IPN
+      price_amount: 1,
       price_currency: 'usd',
       pay_currency: currency,
       ipn_callback_url: 'https://api.treasurenftx.xyz/api/deposit/ipn',
@@ -39,18 +56,18 @@ router.post('/deposit/create-deposit', async (req, res) => {
 
     console.log('📤 Sending to NowPayments:', paymentData);
 
-    // ✅ Step 4: Send request to NowPayments
     const payment = await createPayment(paymentData);
 
     console.log('✅ NowPayments response:', payment);
 
-    // ✅ Step 5: Save deposit with "waiting" status
-    await Deposit.create({
+    // ✅ Step 5: Save new deposit
+    const newDeposit = await Deposit.create({
       userId,
-      amount: 0, // to be updated on IPN
+      amount: 0,
       currency,
       paymentId: payment.payment_id,
       payAddress: payment.pay_address,
+      invoice_url: payment.invoice_url,
       status: 'waiting',
     });
 
@@ -64,7 +81,6 @@ router.post('/deposit/create-deposit', async (req, res) => {
 
   } catch (err) {
     console.error('❌ Deposit creation error:', err?.response?.data || err.message || err);
-
     return res.status(500).json({
       success: false,
       message: 'Deposit failed',
