@@ -101,30 +101,24 @@ exports.getTeamLevels = async (req, res) => {
       return res.status(400).json({ message: "Invalid user ID" });
     }
 
-    // Find all users whose uplineA, uplineB, or uplineC is the current user
-    const users = await User.find({
-      $or: [
-        { uplineA: userId },
-        { uplineB: userId },
-        { uplineC: userId },
-      ],
-    }).select("userId name email level uplineA uplineB uplineC");
+    // Step 1: Get all direct referrals
+    const levelAUsers = await User.find({ uplineA: userId })
+      .select("userId name email level");
 
-    // Group by level (A, B, C)
-    const levelA = [];
-    const levelB = [];
-    const levelC = [];
+    // Step 2: Get users referred by levelA (i.e. uplineB is me indirectly)
+    const levelAIds = levelAUsers.map(u => u._id);
+    const levelBUsers = await User.find({ uplineB: userId, referredBy: { $in: levelAIds } })
+      .select("userId name email level");
 
-    users.forEach((user) => {
-      if (user.uplineA?.toString() === userId) levelA.push(user);
-      else if (user.uplineB?.toString() === userId) levelB.push(user);
-      else if (user.uplineC?.toString() === userId) levelC.push(user);
-    });
+    // Step 3: Get users referred by levelB (i.e. uplineC is me indirectly)
+    const levelBIds = levelBUsers.map(u => u._id);
+    const levelCUsers = await User.find({ uplineC: userId, referredBy: { $in: levelBIds } })
+      .select("userId name email level");
 
     res.status(200).json({
-      A: levelA,
-      B: levelB,
-      C: levelC,
+      A: levelAUsers,
+      B: levelBUsers,
+      C: levelCUsers,
     });
 
   } catch (error) {
