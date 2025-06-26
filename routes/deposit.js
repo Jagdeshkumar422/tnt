@@ -10,39 +10,66 @@ router.post('/deposit/create-deposit', async (req, res) => {
   try {
     const { currency, userId } = req.body;
 
+    // ✅ Step 1: Validate inputs
     if (!currency || !userId) {
-      return res.status(400).json({ success: false, message: 'Missing currency or userId' });
+      return res.status(400).json({
+        success: false,
+        message: 'Missing currency or userId',
+      });
     }
 
+    // ✅ Step 2: Validate supported currencies
+    const supportedCurrencies = ['bnbusdt', 'usdttrc20']; // add more if needed
+    if (!supportedCurrencies.includes(currency)) {
+      return res.status(400).json({
+        success: false,
+        message: `Currency ${currency} is not supported`,
+      });
+    }
+
+    // ✅ Step 3: Build payment payload
     const paymentData = {
-      price_amount: 1, // placeholder amount
+      price_amount: 1, // temporary placeholder amount, final amount will be detected via IPN
       price_currency: 'usd',
-      pay_currency: currency, // e.g., usdttrc20
+      pay_currency: currency,
       ipn_callback_url: 'https://api.treasurenftx.xyz/api/deposit/ipn',
       order_id: `order-${Date.now()}-${userId}`,
       order_description: 'User deposit for Mmt3x',
     };
 
+    console.log('📤 Sending to NowPayments:', paymentData);
+
+    // ✅ Step 4: Send request to NowPayments
     const payment = await createPayment(paymentData);
 
+    console.log('✅ NowPayments response:', payment);
+
+    // ✅ Step 5: Save deposit with "waiting" status
     await Deposit.create({
       userId,
-      amount: 0, // will be updated after confirmation
+      amount: 0, // to be updated on IPN
       currency,
       paymentId: payment.payment_id,
       payAddress: payment.pay_address,
       status: 'waiting',
     });
 
-    res.json({
+    // ✅ Step 6: Return response
+    return res.json({
       success: true,
       address: payment.pay_address,
       paymentId: payment.payment_id,
       invoice_url: payment.invoice_url,
     });
+
   } catch (err) {
-    console.error('Deposit creation error:', err?.response?.data || err.message);
-    res.status(500).json({ success: false, message: 'Deposit failed', error: err.message });
+    console.error('❌ Deposit creation error:', err?.response?.data || err.message || err);
+
+    return res.status(500).json({
+      success: false,
+      message: 'Deposit failed',
+      error: err?.response?.data || err.message || 'Unknown server error',
+    });
   }
 });
 
