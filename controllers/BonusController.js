@@ -94,14 +94,15 @@ exports.getUserBonusSummary = async (req, res) => {
 
 
 exports.getTeamLevels = async (req, res) => {
-  try {
+    try {
     const userId = req.user.id || req.user._id;
 
-    // Ensure the userId is a valid ObjectId
+    // ✅ Validate userId
     if (!mongoose.Types.ObjectId.isValid(userId)) {
       return res.status(400).json({ message: "Invalid user ID" });
     }
 
+    // ✅ Find the user and populate upline references
     const user = await User.findById(userId)
       .populate("uplineA", "userId name email level")
       .populate("uplineB", "userId name email level")
@@ -111,28 +112,29 @@ exports.getTeamLevels = async (req, res) => {
       return res.status(404).json({ message: "User not found" });
     }
 
+    // ✅ Return populated uplines
     const uplines = {
-      A: user.uplineA
+      uplineA: user.uplineA
         ? {
-            id: user.uplineA._id,
+            _id: user.uplineA._id,
             userId: user.uplineA.userId,
             name: user.uplineA.name,
             email: user.uplineA.email,
             level: user.uplineA.level,
           }
         : null,
-      B: user.uplineB
+      uplineB: user.uplineB
         ? {
-            id: user.uplineB._id,
+            _id: user.uplineB._id,
             userId: user.uplineB.userId,
             name: user.uplineB.name,
             email: user.uplineB.email,
             level: user.uplineB.level,
           }
         : null,
-      C: user.uplineC
+      uplineC: user.uplineC
         ? {
-            id: user.uplineC._id,
+            _id: user.uplineC._id,
             userId: user.uplineC.userId,
             name: user.uplineC.name,
             email: user.uplineC.email,
@@ -141,9 +143,10 @@ exports.getTeamLevels = async (req, res) => {
         : null,
     };
 
-    return res.status(200).json({ uplines });
+    return res.status(200).json({ success: true, uplines });
+
   } catch (err) {
-    console.error("❌ Error fetching uplines:", err);
-    res.status(500).json({ error: "Failed to fetch uplines" });
+    console.error("❌ Error in getTeamUplines:", err);
+    return res.status(500).json({ success: false, error: "Internal Server Error" });
   }
 };
