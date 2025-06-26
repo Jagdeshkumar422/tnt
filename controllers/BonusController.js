@@ -94,79 +94,50 @@ exports.getUserBonusSummary = async (req, res) => {
 
 
 exports.getTeamLevels = async (req, res) => {
-  try {
-    const userId = req.user.id; // Current user (the root of downline)
+   try {
+    const userId = req.user.id;
 
-    // Initialize arrays for levels 1–6
-    const levelUsers = Array(7).fill().map(() => []); // Index 1–6 used
+    const user = await User.findById(userId)
+      .populate("uplineA", "userId name email level")
+      .populate("uplineB", "userId name email level")
+      .populate("uplineC", "userId name email level");
 
-    // Fetch all users referred directly or indirectly (up to 6 levels deep)
-    let currentLevelIds = [userId];
-    for (let level = 1; level <= 6; level++) {
-      if (currentLevelIds.length === 0) break;
+    if (!user) return res.status(404).json({ message: "User not found" });
 
-      // Find users whose uplineA is in the current level's IDs
-      const users = await User.find({ uplineA: { $in: currentLevelIds } }).select(
-        '_id userId level uplineA'
-      );
+    const uplines = {
+      A: user.uplineA
+        ? {
+            id: user.uplineA._id,
+            userId: user.uplineA.userId,
+            name: user.uplineA.name,
+            email: user.uplineA.email,
+            level: user.uplineA.level,
+          }
+        : null,
+      B: user.uplineB
+        ? {
+            id: user.uplineB._id,
+            userId: user.uplineB.userId,
+            name: user.uplineB.name,
+            email: user.uplineB.email,
+            level: user.uplineB.level,
+          }
+        : null,
+      C: user.uplineC
+        ? {
+            id: user.uplineC._id,
+            userId: user.uplineC.userId,
+            name: user.uplineC.name,
+            email: user.uplineC.email,
+            level: user.uplineC.level,
+          }
+        : null,
+    };
 
-      // Group users by their 'level' field
-      users.forEach((user) => {
-        const userLevel = user.level || level; // Fallback to computed level if 'level' is missing
-        if (userLevel >= 1 && userLevel <= 6) {
-          levelUsers[userLevel].push(user);
-        }
-      });
-
-      // Prepare IDs for the next level
-      currentLevelIds = users.map((u) => u._id);
-    }
-
-    // Format each level's data
-    const levelData = await Promise.all(
-      levelUsers.slice(1).map(async (users, idx) => {
-        const level = idx + 1;
-        const userCount = users.length;
-
-        // Get user details and bonuses for this level
-        const userDetails = await Promise.all(
-          users.map(async (user) => {
-            // Get total bonuses earned from this specific user
-            const bonuses = await BonusHistory.aggregate([
-              {
-                $match: {
-                  userId: userId, // Bonus earned by this user
-                  sourceUserId: user._id, // From this specific user
-                  level: level,
-                },
-              },
-              {
-                $group: {
-                  _id: null,
-                  total: { $sum: '$amount' },
-                },
-              },
-            ]);
-
-            return {
-              userId: user._id || user._id.toString(), // Use userId or _id
-              profit: bonuses[0]?.total.toFixed(3) || '0.000',
-            };
-          })
-        );
-
-        return {
-          level,
-          count: userCount,
-          users: userDetails, // Array of users with their details
-        };
-      })
-    );
-
-    res.status(200).json(levelData);
+    res.status(200).json({ uplines });
   } catch (err) {
-    console.error('Error fetching team levels:', err);
-    res.status(500).json({ error: 'Failed to fetch team data' });
+    console.error("Error fetching uplines:", err);
+    res.status(500).json({ error: "Failed to fetch uplines" });
   }
 };
 
