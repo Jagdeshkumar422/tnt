@@ -3,14 +3,13 @@ const router = express.Router();
 const { createPayment } = require('../config/nowpayment');
 const Deposit = require('../models/Deposit');
 const User = require('../models/User');
-const BonusHistory = require('../models/BonusHistory');
 const updateUserLevel = require("../utils/updateUserLevel");
 
+// Create Deposit Route
 router.post('/deposit/create-deposit', async (req, res) => {
   try {
     const { currency, userId } = req.body;
 
-    // ✅ Step 1: Validate inputs
     if (!currency || !userId) {
       return res.status(400).json({
         success: false,
@@ -18,7 +17,7 @@ router.post('/deposit/create-deposit', async (req, res) => {
       });
     }
 
-    // ✅ Step 2: Validate supported currencies
+    // Supported currencies
     const supportedCurrencies = ['usdttrc20', 'usdtbsc', 'bnbbsc', 'busdbsc'];
     if (!supportedCurrencies.includes(currency)) {
       return res.status(400).json({
@@ -27,7 +26,7 @@ router.post('/deposit/create-deposit', async (req, res) => {
       });
     }
 
-    // ✅ Step 3: Check if existing 'waiting' deposit exists for user + currency
+    // Check if a waiting deposit already exists for this user and currency
     const existingDeposit = await Deposit.findOne({
       userId,
       currency,
@@ -44,7 +43,7 @@ router.post('/deposit/create-deposit', async (req, res) => {
       });
     }
 
-    // ✅ Step 4: Create new payment
+    // Create new payment with NowPayments
     const paymentData = {
       price_amount: 1,
       price_currency: 'usd',
@@ -60,7 +59,7 @@ router.post('/deposit/create-deposit', async (req, res) => {
 
     console.log('✅ NowPayments response:', payment);
 
-    // ✅ Step 5: Save new deposit
+    // Save deposit with "waiting" status
     const newDeposit = await Deposit.create({
       userId,
       amount: 0,
@@ -71,7 +70,6 @@ router.post('/deposit/create-deposit', async (req, res) => {
       status: 'waiting',
     });
 
-    // ✅ Step 6: Return response
     return res.json({
       success: true,
       address: payment.pay_address,
@@ -89,22 +87,23 @@ router.post('/deposit/create-deposit', async (req, res) => {
   }
 });
 
-
-// STEP 2: NowPayments IPN Handler
-// IPN Callback Handler
+// ✅ Fixed IPN Handler
 router.post('/deposit/ipn', async (req, res) => {
   try {
-    const body = JSON.parse(req.body.toString('utf8'));
-    const { payment_id, payment_status, price_amount } = body;
+    console.log('📩 Received IPN:', req.body);
+
+    const { payment_id, payment_status, price_amount } = req.body;
 
     const deposit = await Deposit.findOne({ paymentId: payment_id });
     if (!deposit) return res.status(404).send("Deposit not found");
 
     if (deposit.status === 'finished') return res.status(200).send("Already processed");
 
-    if (payment_status === 'finished') {
+    const finalStatuses = ['finished', 'confirmed', 'sending'];
+
+    if (finalStatuses.includes(payment_status)) {
       deposit.status = 'finished';
-      deposit.amount = price_amount; // ✅ set real amount from NowPayments
+      deposit.amount = price_amount;
 
       const user = await User.findById(deposit.userId);
       if (!user) return res.status(404).send("User not found");
@@ -120,13 +119,12 @@ router.post('/deposit/ipn', async (req, res) => {
     await deposit.save();
     res.status(200).send('OK');
   } catch (err) {
-    console.error('IPN error:', err);
+    console.error('❌ IPN error:', err);
     res.status(500).send('IPN handling failed');
   }
 });
 
-
-// Get all deposits
+// Get all deposits (for admin/debug)
 router.get("/getdeposit", async (req, res) => {
   try {
     const deposits = await Deposit.find().populate("userId", "name email userId");
