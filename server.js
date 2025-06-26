@@ -27,7 +27,7 @@ app.use(
   })
 );
 
-app.use('/api/deposit/ipn', express.raw({ type: 'application/json' }));
+app.use('/api/ipn', express.raw({ type: '*/*' }));
 
 // app.use(cors());
 app.use(express.json());
