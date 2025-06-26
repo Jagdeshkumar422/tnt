@@ -94,52 +94,42 @@ exports.getUserBonusSummary = async (req, res) => {
 
 
 exports.getTeamLevels = async (req, res) => {
-    try {
-    const userId = req.user.id || req.user._id;
+ try {
+    const userId = req.user.id;
 
-    // Validate ObjectId
     if (!mongoose.Types.ObjectId.isValid(userId)) {
       return res.status(400).json({ message: "Invalid user ID" });
     }
 
-    // Find user and populate upline fields
-    const user = await User.findById(userId)
-      .populate('uplineA', 'userId name email level')
-      .populate('uplineB', 'userId name email level')
-      .populate('uplineC', 'userId name email level');
+    // Find all users whose uplineA, uplineB, or uplineC is the current user
+    const users = await User.find({
+      $or: [
+        { uplineA: userId },
+        { uplineB: userId },
+        { uplineC: userId },
+      ],
+    }).select("userId name email level uplineA uplineB uplineC");
 
-    if (!user) {
-      return res.status(404).json({ message: "User not found" });
-    }
+    // Group by level (A, B, C)
+    const levelA = [];
+    const levelB = [];
+    const levelC = [];
 
-    // Prepare the upline data
-    const uplines = {
-      A: user.uplineA ? {
-        id: user.uplineA._id,
-        userId: user.uplineA.userId,
-        name: user.uplineA.name,
-        email: user.uplineA.email,
-        level: user.uplineA.level
-      } : null,
-      B: user.uplineB ? {
-        id: user.uplineB._id,
-        userId: user.uplineB.userId,
-        name: user.uplineB.name,
-        email: user.uplineB.email,
-        level: user.uplineB.level
-      } : null,
-      C: user.uplineC ? {
-        id: user.uplineC._id,
-        userId: user.uplineC.userId,
-        name: user.uplineC.name,
-        email: user.uplineC.email,
-        level: user.uplineC.level
-      } : null
-    };
+    users.forEach((user) => {
+      if (user.uplineA?.toString() === userId) levelA.push(user);
+      else if (user.uplineB?.toString() === userId) levelB.push(user);
+      else if (user.uplineC?.toString() === userId) levelC.push(user);
+    });
 
-    return res.status(200).json({ success: true, uplines });
-  } catch (err) {
-    console.error("❌ Error in getMyUplines:", err);
-    return res.status(500).json({ message: "Server error" });
+    res.status(200).json({
+      A: levelA,
+      B: levelB,
+      C: levelC,
+    });
+
+  } catch (error) {
+    console.error("Error fetching downline:", error);
+    res.status(500).json({ message: "Server error" });
   }
 };
+
