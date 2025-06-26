@@ -11,34 +11,50 @@ router.post('/create-deposit', async (req, res) => {
   try {
     const { amount, currency, userId } = req.body;
 
+    if (!amount || !currency || !userId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Missing required fields: amount, currency, or userId'
+      });
+    }
+
     const paymentData = {
       price_amount: amount,
       price_currency: 'usd',
-      pay_currency: currency,
-      ipn_callback_url: `https://api.treasurenftx.xyz/api/deposit/ipn`,
+      pay_currency: currency, // e.g., usdttrc20
+      ipn_callback_url: 'https://api.treasurenftx.xyz/api/deposit/ipn',
       order_id: `order-${Date.now()}-${userId}`,
+      order_description: 'User deposit for TreasureNFTX'
     };
 
+    // Create payment with NowPayments
     const payment = await createPayment(paymentData);
 
+    // Save deposit info in DB
     await Deposit.create({
       userId,
       amount,
       currency,
       paymentId: payment.payment_id,
       payAddress: payment.pay_address,
-      status: 'waiting',
+      status: 'waiting'
     });
 
     res.json({
       success: true,
       payment_url: payment.invoice_url,
       address: payment.pay_address,
-      paymentId: payment.payment_id,
+      paymentId: payment.payment_id
     });
+
   } catch (err) {
-    console.error('Create Deposit Error:', err?.response?.data || err.message || err);
-    res.status(500).json({ success: false, message: 'Deposit failed.' });
+    console.error('🛑 Deposit Creation Error:', err?.response?.data || err.message || err);
+
+    res.status(500).json({
+      success: false,
+      message: 'Deposit failed.',
+      error: err?.response?.data || err.message || err
+    });
   }
 });
 
