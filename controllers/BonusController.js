@@ -101,10 +101,14 @@ exports.getTeamLevels = async (req, res) => {
       return res.status(400).json({ message: "Invalid user ID" });
     }
 
-    // Find users where current user is uplineA, B, or C
+    // Limit each level to only users directly linked to current user
     const teamA = await User.find({ uplineA: userId }).select("userId name email level");
-    const teamB = await User.find({ uplineB: userId }).select("userId name email level");
-    const teamC = await User.find({ uplineC: userId }).select("userId name email level");
+    const teamB = await User.find({ uplineB: userId, uplineA: { $ne: userId } }).select("userId name email level");
+    const teamC = await User.find({
+      uplineC: userId,
+      uplineA: { $ne: userId },
+      uplineB: { $ne: userId }
+    }).select("userId name email level");
 
     return res.status(200).json({
       success: true,
