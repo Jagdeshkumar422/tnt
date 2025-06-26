@@ -97,19 +97,19 @@ exports.getTeamLevels = async (req, res) => {
     try {
     const userId = req.user.id || req.user._id;
 
-    // Validate userId
     if (!mongoose.Types.ObjectId.isValid(userId)) {
-      return res.status(400).json({ message: "Invalid user ID" });
+      return res.status(400).json({ message: 'Invalid user ID' });
     }
 
-    // Fetch current user with populated uplines
+    // Fetch the user and populate their uplines
     const user = await User.findById(userId)
-      .populate("uplineA", "userId name email level")
-      .populate("uplineB", "userId name email level")
-      .populate("uplineC", "userId name email level");
+      .populate('uplineA', 'userId name email level')
+      .populate('uplineB', 'userId name email level')
+      .populate('uplineC', 'userId name email level')
+      .lean();
 
     if (!user) {
-      return res.status(404).json({ message: "User not found" });
+      return res.status(404).json({ message: 'User not found' });
     }
 
     const uplines = {
@@ -118,10 +118,9 @@ exports.getTeamLevels = async (req, res) => {
       uplineC: user.uplineC || null
     };
 
-    return res.status(200).json({ uplines });
-
-  } catch (error) {
-    console.error("❌ Error fetching uplines:", error);
-    return res.status(500).json({ message: "Server error" });
+    res.status(200).json({ success: true, uplines });
+  } catch (err) {
+    console.error('❌ Error in getMyUplines:', err);
+    res.status(500).json({ success: false, message: 'Server error' });
   }
 };
