@@ -7,7 +7,7 @@ const BonusHistory = require('../models/BonusHistory');
 const updateUserLevel = require("../utils/updateUserLevel");
 
 // STEP 1: Create Payment
-router.post('/create-deposit', async (req, res) => {
+router.post('/deposit/create-deposit', async (req, res) => {
   try {
     const { amount, currency, userId } = req.body;
 
