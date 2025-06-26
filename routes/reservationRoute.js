@@ -103,14 +103,7 @@ router.get('/last-reservation', auth, async (req, res) => {
 
 const BonusHistory = require('../models/BonusHistory');
 
-const LEVEL_BONUSES = {
-  1: 0.02,
-  2: 0.025,
-  3: 0.028,
-  4: 0.03,
-  5: 0.04,
-  6: 0.04,
-};
+
 
 router.post('/sell', auth, async (req, res) => {
   try {
