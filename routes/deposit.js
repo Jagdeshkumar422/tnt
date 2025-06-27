@@ -72,7 +72,6 @@ router.post('/deposit/ipn', async (req, res) => {
   try {
     console.log('📩 Received IPN:', req.body);
     const { payment_id, payment_status, price_amount } = req.body;
-    res.send(payment_id,payment_status,price_amount)
 
     console.log("Looking for payment_id:", payment_id);
 const deposit = await Deposit.findOne({ paymentId: payment_id});
