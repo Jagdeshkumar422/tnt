@@ -45,9 +45,9 @@ router.post('/deposit/create-deposit', async (req, res) => {
       userId,
       amount: 0,
       currency,
-      paymentId: String(payment.payment_id).trim(), // Ensure string format
+      paymentId: String(payment.payment_id).trim(),
       payAddress: payment.pay_address,
-      invoice_url: payment.invoice_url || '', // Handle missing invoice_url
+      invoice_url: payment.invoice_url || '',
       status: 'waiting',
       createdAt: new Date(),
       updatedAt: new Date(),
@@ -76,7 +76,7 @@ router.post('/deposit/ipn', async (req, res) => {
     console.log('📋 Request headers:', req.headers);
     console.log('📩 Received IPN:', JSON.stringify(req.body, null, 2));
 
-    // Verify IPN signature (commented out for testing)
+    // Verify IPN signature (bypassed for testing)
     /*
     const signature = req.headers['x-nowpayments-sig'];
     const ipnSecret = process.env.NOWPAYMENTS_IPN_SECRET;
