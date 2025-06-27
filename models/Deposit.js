@@ -20,6 +20,11 @@ const depositSchema = new mongoose.Schema({
     required: true, 
     trim: true 
   },
+  orderId: { 
+    type: String, 
+    required: true, 
+    trim: true 
+  },
   payAddress: { 
     type: String, 
     required: true 

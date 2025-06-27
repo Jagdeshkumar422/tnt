@@ -25,17 +25,19 @@ router.post('/deposit/create-deposit', async (req, res) => {
         success: true,
         address: existingDeposit.payAddress,
         paymentId: existingDeposit.paymentId,
+        orderId: existingDeposit.orderId,
         invoice_url: existingDeposit.invoice_url,
         message: 'Existing deposit address reused',
       });
     }
 
+    const orderId = `order-${Date.now()}-${userId}`;
     const paymentData = {
       price_amount: 1,
       price_currency: 'usd',
       pay_currency: currency,
       ipn_callback_url: 'https://api.treasurenftx.xyz/api/deposit/ipn',
-      order_id: `order-${Date.now()}-${userId}`,
+      order_id: orderId,
       order_description: 'User deposit for Mmt3x',
     };
 
@@ -46,6 +48,7 @@ router.post('/deposit/create-deposit', async (req, res) => {
       amount: 0,
       currency,
       paymentId: String(payment.payment_id).trim(),
+      orderId: orderId,
       payAddress: payment.pay_address,
       invoice_url: payment.invoice_url || '',
       status: 'waiting',
@@ -57,6 +60,7 @@ router.post('/deposit/create-deposit', async (req, res) => {
       success: true,
       address: payment.pay_address,
       paymentId: payment.payment_id,
+      orderId: orderId,
       invoice_url: payment.invoice_url,
     });
   } catch (err) {
@@ -96,25 +100,29 @@ router.post('/deposit/ipn', async (req, res) => {
     }
     */
 
-    const { payment_id, payment_status, price_amount } = req.body;
+    const { payment_id, payment_status, price_amount, order_id } = req.body;
 
     if (!payment_id || !payment_status) {
       console.error('❌ Missing payment_id or payment_status in IPN payload', { payment_id, payment_status });
       return res.status(400).send('Missing payment_id or payment_status');
     }
 
-    // Ensure payment_id is a string and trimmed
+    // Ensure payment_id and order_id are strings and trimmed
     const paymentId = String(payment_id).trim();
-    console.log(`🔍 Looking for payment_id: "${paymentId}" (type: ${typeof paymentId})`);
+    const orderId = order_id ? String(order_id).trim() : null;
+    console.log(`🔍 Looking for payment_id: "${paymentId}" and order_id: "${orderId}"`);
 
-    // Query for deposit with debugging
-    const deposit = await Deposit.findOne({ paymentId });
+    // Query for deposit with paymentId and optional orderId
+    const query = { paymentId };
+    if (orderId) query.orderId = orderId;
+    const deposit = await Deposit.findOne(query);
     if (!deposit) {
-      // Log all deposits to check available paymentIds
-      const allDeposits = await Deposit.find({}, { paymentId: 1 });
-      console.error(`❌ No deposit found for payment_id: "${paymentId}"`, {
+      // Log all deposits to check available paymentIds and orderIds
+      const allDeposits = await Deposit.find({}, { paymentId: 1, orderId: 1 });
+      console.error(`❌ No deposit found for payment_id: "${paymentId}" and order_id: "${orderId}"`, {
         searchedPaymentId: paymentId,
-        availablePaymentIds: allDeposits.map(d => d.paymentId),
+        searchedOrderId: orderId,
+        availableDeposits: allDeposits.map(d => ({ paymentId: d.paymentId, orderId: d.orderId })),
       });
       return res.status(404).send('Deposit not found');
     }
