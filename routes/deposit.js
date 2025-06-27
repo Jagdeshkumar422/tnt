@@ -5,7 +5,6 @@ const Deposit = require('../models/Deposit');
 const User = require('../models/User');
 const crypto = require('crypto');
 
-// Create Deposit Route
 router.post('/deposit/create-deposit', async (req, res) => {
   try {
     const { currency, userId } = req.body;
@@ -21,7 +20,7 @@ router.post('/deposit/create-deposit', async (req, res) => {
       return res.status(400).json({ success: false, message: `Currency ${currency} is not supported` });
     }
 
-    // Check for an existing 'waiting' deposit for the same user and currency
+
     const existingDeposit = await Deposit.findOne({ userId, currency, status: 'waiting' });
     if (existingDeposit) {
       console.log(`ℹ️ Deposit creation: Reusing existing 'waiting' deposit for userId: ${userId}, currency: ${currency}. PaymentId: ${existingDeposit.paymentId}`);
@@ -35,10 +34,10 @@ router.post('/deposit/create-deposit', async (req, res) => {
       });
     }
 
-    // Generate a unique order ID
+
     const orderId = `order-${Date.now()}-${userId}`;
     const paymentData = {
-      price_amount: 1, // This is the amount you want to see in USD on the invoice.
+      price_amount: 1, 
       price_currency: 'usd',
       pay_currency: currency,
       ipn_callback_url: 'https://api.treasurenftx.xyz/api/deposit/ipn',
@@ -49,16 +48,16 @@ router.post('/deposit/create-deposit', async (req, res) => {
     console.log(`🌍 Creating NOWPayments payment for userId: ${userId}, currency: ${currency}, orderId: ${orderId}`);
     const payment = await createPayment(paymentData);
 
-    // Create a new deposit record in your database
+    
     const newDeposit = await Deposit.create({
       userId,
-      amount: 0, // Initialize amount to 0, it will be updated by IPN
+      amount: 0,
       currency,
       paymentId: String(payment.payment_id).trim(),
       orderId: orderId,
       payAddress: payment.pay_address,
       invoice_url: payment.invoice_url || '',
-      status: 'waiting', // Initial status
+      status: 'waiting', 
       createdAt: new Date(),
       updatedAt: new Date(),
     });
@@ -81,10 +80,9 @@ router.post('/deposit/create-deposit', async (req, res) => {
   }
 });
 
-// IPN Handler with Bonus Distribution and Signature Verification
+
 router.post('/deposit/ipn', async (req, res) => {
   try {
-    // Log headers and body for debugging purposes. NEVER expose secrets in logs.
     console.log('📋 Received IPN headers:', req.headers);
     console.log('📩 Received IPN payload:', JSON.stringify(req.body, null, 2));
 
@@ -113,27 +111,25 @@ router.post('/deposit/ipn', async (req, res) => {
     // Destructure relevant fields from the IPN payload
     const { payment_id, payment_status, actually_paid, order_id } = req.body; // <-- KEY CHANGE: Use 'actually_paid'
 
-    // Basic validation of required IPN fields
+
     if (!payment_id || !payment_status) {
       console.error('❌ IPN: Missing essential fields (payment_id or payment_status) in payload.', { payment_id, payment_status });
       return res.status(400).send('Missing payment_id or payment_status');
     }
 
-    // Trim whitespace from IDs for robust matching
     const paymentId = String(payment_id).trim();
     const orderId = order_id ? String(order_id).trim() : null;
     console.log(`🔍 IPN: Attempting to find deposit for payment_id: "${paymentId}" and order_id: "${orderId || 'N/A'}"`);
 
-    // Construct query for the deposit record
+   
     const query = { paymentId };
-    if (orderId) query.orderId = orderId; // Only add orderId to query if it exists
+    if (orderId) query.orderId = orderId;
 
-    // Find the corresponding deposit record in your database
+
     const deposit = await Deposit.findOne(query);
 
     if (!deposit) {
-      // If deposit not found, it might be due to a mismatch or a rogue IPN.
-      // Log existing payment and order IDs to aid debugging.
+ 
       const allDepositsSummary = await Deposit.find({}, { paymentId: 1, orderId: 1, _id: 0 }).lean();
       console.error(`❌ IPN: No matching deposit found for payment_id: "${paymentId}" and order_id: "${orderId || 'N/A'}".`, {
         searchedPaymentId: paymentId,
@@ -145,33 +141,31 @@ router.post('/deposit/ipn', async (req, res) => {
 
     console.log(`✅ IPN: Deposit record found: ${JSON.stringify(deposit, null, 2)}`);
 
-    // Prevent re-processing if the deposit is already in a final state
+
     const finalProcessedStates = ['finished', 'failed', 'expired', 'refunded'];
     if (finalProcessedStates.includes(deposit.status)) {
         console.log(`ℹ️ IPN: Deposit (paymentId: ${paymentId}) already processed with status: "${deposit.status}". Skipping further updates.`);
         return res.status(200).send('Already processed');
     }
 
-    // Update the deposit's status and last update timestamp
     deposit.status = payment_status;
     deposit.updatedAt = new Date();
     console.log(`🔄 IPN: Updating deposit (paymentId: ${paymentId}) status to: "${payment_status}".`);
 
-    // Define statuses that indicate a successful payment for balance update
     const successfulPaymentStatuses = ['finished', 'confirmed', 'sending'];
     const failedOrExpiredStatuses = ['failed', 'expired', 'refunded'];
 
     if (successfulPaymentStatuses.includes(payment_status)) {
-      const actualDepositAmount = parseFloat(actually_paid) || 0; // Parse the actual amount received
+      const actualDepositAmount = parseFloat(actually_paid) || 0; 
 
       if (actualDepositAmount <= 0) {
         console.warn(`⚠️ IPN: Received zero or negative actual_paid amount (${actualDepositAmount}) for paymentId: ${paymentId}. Skipping user balance update.`);
-        // Even if the status is successful, if the amount is invalid, do not credit user.
+       
       } else {
-        deposit.amount = actualDepositAmount; // Store the actual amount received
+        deposit.amount = actualDepositAmount; 
         console.log(`💰 IPN: Deposit (paymentId: ${paymentId}) amount set to actual paid amount: ${deposit.amount}`);
 
-        // Find the user to update their balance and apply bonuses
+      
         const user = await User.findById(deposit.userId).populate('uplineA uplineB uplineC');
         if (!user) {
           console.error(`❌ IPN: User not found for userId: ${deposit.userId} associated with deposit ${paymentId}. Cannot update balance or bonuses.`);

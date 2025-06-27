@@ -75,38 +75,40 @@ exports.register = async (req, res) => {
   } = req.body;
 
   try {
-    // Step 1: Basic validations
+    // Step 1: Normalize and validate email
+    if (!email) return res.status(400).json({ message: "Email is required." });
+    const normalizedEmail = email.trim().toLowerCase();
+
+    // Step 2: Validate referral code
     if (!referralCode) {
       return res.status(400).json({ message: "Referral code is required." });
     }
 
-    const existingUser = await User.findOne({ email });
+    // Step 3: Check for existing user
+    const existingUser = await User.findOne({ email: normalizedEmail });
     if (existingUser) {
       return res.status(400).json({ message: "Email is already registered." });
     }
 
-    const saved = codes[email];
+    // Step 4: Check verification code
+    const saved = codes[normalizedEmail];
     if (!saved || saved.code !== parseInt(code)) {
       return res.status(400).json({ message: "Invalid verification code." });
     }
-
     if (Date.now() > saved.expiresAt) {
-      delete codes[email];
+      delete codes[normalizedEmail];
       return res.status(400).json({ message: "Verification code expired." });
     }
 
-    // Step 2: Set up referrer/uplines
+    // Step 5: Set up referrer/uplines
     let referrerA = null;
     let uplineB = null;
     let uplineC = null;
 
     if (referralCode === DEFAULT_REFERRAL_CODE) {
-      const existingAdminReferrer = await User.findOne({ referralCode: DEFAULT_REFERRAL_CODE });
-      if (!existingAdminReferrer) {
-        // Allow first user to register using default code
-        referrerA = null;
-      } else {
-        referrerA = existingAdminReferrer;
+      const adminReferrer = await User.findOne({ referralCode: DEFAULT_REFERRAL_CODE });
+      if (adminReferrer) {
+        referrerA = adminReferrer;
         uplineB = referrerA.uplineA || null;
         uplineC = referrerA.uplineB || null;
       }
@@ -119,16 +121,15 @@ exports.register = async (req, res) => {
       uplineC = referrerA.uplineB || null;
     }
 
-    // Step 3: Create user
+    // Step 6: Create new user
     const newUser = new User({
       phone,
       countryCode,
-      email,
+      email: normalizedEmail,
       loginPassword,
       transactionPassword,
       userId: Math.floor(100000 + Math.random() * 900000).toString(),
       referralCode: generateReferralCode(),
-
       referredBy: referrerA?._id || null,
       uplineA: referrerA?._id || null,
       uplineB,
@@ -137,21 +138,28 @@ exports.register = async (req, res) => {
 
     await newUser.save();
 
-    // Step 4: Update referrer’s referrals
+    // Step 7: Add referral
     if (referrerA) {
       referrerA.referrals.push(newUser._id);
       await referrerA.save();
     }
 
-    // Step 5: Generate wallets
+    // Step 8: Generate wallet
     await generateWalletForUser(newUser._id);
 
-    // Step 6: Clear OTP and respond
-    delete codes[email];
-    res.json({ message: "User registered successfully." });
+    // Step 9: Clear OTP
+    delete codes[normalizedEmail];
+
+    return res.status(200).json({ message: "User registered successfully." });
+
   } catch (err) {
+    // Handle duplicate key error (e.g., email already exists even with index)
+    if (err.code === 11000 && err.keyPattern?.email) {
+      return res.status(400).json({ message: "Email is already registered." });
+    }
+
     console.error("Registration Error:", err);
-    res.status(500).json({ message: "Registration failed." });
+    return res.status(500).json({ message: "Registration failed." });
   }
 };
 
