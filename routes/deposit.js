@@ -72,9 +72,10 @@ router.post('/deposit/ipn', async (req, res) => {
   try {
     console.log('📩 Received IPN:', req.body);
     const { payment_id, payment_status, price_amount } = req.body;
+    res.send(payment_id,payment_status,price_amount)
 
     console.log("Looking for payment_id:", payment_id);
-const deposit = await Deposit.findOne({ paymentId: String(payment_id).trim() });
+const deposit = await Deposit.findOne({ paymentId: payment_id});
 console.log("Deposit found?", deposit);
     if (!deposit) return res.status(404).send("Deposit not found");
     if (deposit.status === 'finished') return res.status(200).send("Already processed");
