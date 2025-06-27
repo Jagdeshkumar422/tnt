@@ -75,7 +75,7 @@ router.post('/deposit/ipn', async (req, res) => {
   try {
     // Verify IPN signature
     const signature = req.headers['x-nowpayments-sig'];
-    const ipnSecret = process.env.NOWPAYMENTS_IPN_SECRET;
+    const ipnSecret = "V73S9nNob70WUzinJG3JXgGA6TTdDj6J";
     if (!signature || !ipnSecret) {
       console.error('❌ Missing IPN signature or secret');
       return res.status(400).send('Missing IPN signature or secret');
