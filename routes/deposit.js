@@ -1,8 +1,10 @@
+// backend/routes/deposit.js
 const express = require('express');
 const router = express.Router();
 const { createPayment } = require('../config/nowpayment');
 const Deposit = require('../models/Deposit');
 const User = require('../models/User');
+const crypto = require('crypto');
 
 // Create Deposit Route
 router.post('/deposit/create-deposit', async (req, res) => {
@@ -44,10 +46,12 @@ router.post('/deposit/create-deposit', async (req, res) => {
       userId,
       amount: 0,
       currency,
-      paymentId: payment.payment_id,
+      paymentId: String(payment.payment_id).trim(), // Ensure string format
       payAddress: payment.pay_address,
-      invoice_url: payment.invoice_url,
+      invoice_url: payment.invoice_url || '', // Handle missing invoice_url
       status: 'waiting',
+      createdAt: new Date(),
+      updatedAt: new Date(),
     });
 
     return res.json({
@@ -56,7 +60,6 @@ router.post('/deposit/create-deposit', async (req, res) => {
       paymentId: payment.payment_id,
       invoice_url: payment.invoice_url,
     });
-
   } catch (err) {
     console.error('❌ Deposit creation error:', err?.response?.data || err.message || err);
     return res.status(500).json({
@@ -67,11 +70,25 @@ router.post('/deposit/create-deposit', async (req, res) => {
   }
 });
 
-// ✅ IPN Handler with Bonus Distribution
-// ✅ IPN Handler with Bonus Distribution
+// ✅ IPN Handler with Bonus Distribution and Signature Verification
 router.post('/deposit/ipn', async (req, res) => {
   try {
-    console.log('📩 Received IPN:', JSON.stringify(req.body, null, 2)); // Log full IPN payload for debugging
+    // Verify IPN signature
+    const signature = req.headers['x-nowpayments-sig'];
+    const ipnSecret = process.env.NOWPAYMENTS_IPN_SECRET;
+    if (!signature || !ipnSecret) {
+      console.error('❌ Missing IPN signature or secret');
+      return res.status(400).send('Missing IPN signature or secret');
+    }
+
+    const sortedBody = JSON.stringify(req.body, Object.keys(req.body).sort());
+    const hmac = crypto.createHmac('sha512', ipnSecret).update(sortedBody).digest('hex');
+    if (signature !== hmac) {
+      console.error('❌ Invalid IPN signature', { received: signature, expected: hmac });
+      return res.status(401).send('Invalid IPN signature');
+    }
+
+    console.log('📩 Received IPN:', JSON.stringify(req.body, null, 2));
     const { payment_id, payment_status, price_amount } = req.body;
 
     if (!payment_id || !payment_status) {
@@ -93,15 +110,16 @@ router.post('/deposit/ipn', async (req, res) => {
       return res.status(200).send('Already processed');
     }
 
-    // ✅ Update the deposit status
+    // Update deposit status
     deposit.status = payment_status;
-    deposit.updatedAt = new Date(); // Track when the status was updated
-
+    deposit.updatedAt = new Date();
     console.log(`🔄 Updating deposit status to: ${payment_status}`);
 
     const finalStatuses = ['finished', 'confirmed', 'sending'];
+    const failedStatuses = ['failed', 'expired', 'refunded'];
+
     if (finalStatuses.includes(payment_status)) {
-      deposit.amount = parseFloat(price_amount) || 0; // Ensure amount is a number
+      deposit.amount = parseFloat(price_amount) || 0;
       console.log(`💰 Deposit amount set to: ${deposit.amount}`);
 
       const user = await User.findById(deposit.userId).populate('uplineA uplineB uplineC');
@@ -111,11 +129,10 @@ router.post('/deposit/ipn', async (req, res) => {
       }
 
       console.log(`👤 User found: ${user._id}, balance: ${user.balance}`);
-
       const depositAmount = parseFloat(price_amount);
       user.balance = (user.balance || 0) + depositAmount;
 
-      // ✅ First deposit bonus (check for other "finished" deposits)
+      // First deposit bonus
       const finishedDeposits = await Deposit.find({
         userId: user._id,
         status: { $in: finalStatuses },
@@ -134,7 +151,7 @@ router.post('/deposit/ipn', async (req, res) => {
         console.log(`🎁 Applied first deposit bonus: ${selfBonus}`);
       }
 
-      // ✅ Upline A (15%)
+      // Upline bonuses
       if (user.uplineA) {
         const bonusA = depositAmount * 0.15;
         user.uplineA.balance = (user.uplineA.balance || 0) + bonusA;
@@ -148,7 +165,6 @@ router.post('/deposit/ipn', async (req, res) => {
         console.log(`🎁 Applied upline A bonus: ${bonusA} to user ${user.uplineA._id}`);
       }
 
-      // ✅ Upline B (10%)
       if (user.uplineB) {
         const bonusB = depositAmount * 0.10;
         user.uplineB.balance = (user.uplineB.balance || 0) + bonusB;
@@ -159,10 +175,9 @@ router.post('/deposit/ipn', async (req, res) => {
           createdAt: new Date(),
         });
         await user.uplineB.save();
-        console.log(`🎁 Applied upline B bonus: to user ${user.uplineB._id}`);
+        console.log(`🎁 Applied upline B bonus: ${bonusB} to user ${user.uplineB._id}`);
       }
 
-      // ✅ Upline C (5%)
       if (user.uplineC) {
         const bonusC = depositAmount * 0.05;
         user.uplineC.balance = (user.uplineC.balance || 0) + bonusC;
@@ -178,6 +193,11 @@ router.post('/deposit/ipn', async (req, res) => {
 
       await user.save();
       console.log(`✅ User balance updated: ${user.balance}`);
+    } else if (failedStatuses.includes(payment_status)) {
+      deposit.status = payment_status;
+      console.log(`⚠️ Deposit marked as ${payment_status}`);
+    } else {
+      console.log(`ℹ️ Intermediate status received: ${payment_status}`);
     }
 
     await deposit.save();
@@ -190,12 +210,13 @@ router.post('/deposit/ipn', async (req, res) => {
 });
 
 // Admin: Get all deposits
-router.get("/getdeposit", async (req, res) => {
+router.get('/getdeposit', async (req, res) => {
   try {
-    const deposits = await Deposit.find().populate("userId", "name email userId");
+    const deposits = await Deposit.find().populate('userId', 'name email userId');
     res.json(deposits);
   } catch (err) {
-    res.status(500).json({ error: "Server error" });
+    console.error('❌ Get deposits error:', err.message);
+    res.status(500).json({ error: 'Server error' });
   }
 });
 

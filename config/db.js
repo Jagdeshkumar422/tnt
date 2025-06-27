@@ -1,15 +1,17 @@
+require('dotenv').config();
 const mongoose = require('mongoose');
-const Admin = require("../models/Admin")
+const Admin = require("../models/Admin");
+
 const createDefaultAdmin = async () => {
   try {
     const existingAdmin = await Admin.findOne({ email: 'admin@example.com' });
     if (!existingAdmin) {
       const newAdmin = new Admin({
-        email: 'admin@gmail.com',
-        password: 'secure123', // This will be hashed automatically
+        email: 'admin@example.com',
+        password: 'secure123',
       });
       await newAdmin.save();
-      console.log('✅ Default admin created: admin@example.com / admin1234');
+      console.log('✅ Default admin created: admin@example.com / secure123');
     } else {
       console.log('✅ Default admin already exists');
     }
@@ -17,13 +19,18 @@ const createDefaultAdmin = async () => {
     console.error('❌ Error creating default admin:', err.message);
   }
 };
+
 const connectDB = async () => {
   try {
-    await mongoose.connect('mongodb+srv://treasusrexnft:admin@cluster0.j1yqv8y.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0');
+    await mongoose.connect(process.env.MONGODB_URI, {
+      useNewUrlParser: true,
+      useUnifiedTopology: true,
+      serverSelectionTimeoutMS: 5000,
+    });
     console.log('✅ MongoDB connected');
-     await createDefaultAdmin()
+    await createDefaultAdmin();
   } catch (err) {
-    console.error('❌ MongoDB connection failed:', err.message);
+    console.error('❌ MongoDB connection failed:', err);
     process.exit(1);
   }
 };
