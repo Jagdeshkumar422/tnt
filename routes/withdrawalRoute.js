@@ -14,21 +14,46 @@ router.get('/user/wallet/:userId', async (req, res) => {
 router.post('/user/withdraw', async (req, res) => {
   const { userId, amount, password, type } = req.body;
 
-  const wallet = await WalletBind.findOne({ userId });
-  if (!wallet) return res.status(400).json({ message: 'Please bind your wallet first.' });
+  try {
+    // Step 1: Validate minimum withdrawal amount
+    if (amount < 50) {
+      return res.status(400).json({ message: 'Minimum withdrawal amount is $50.' });
+    }
 
-  const address = type === 'TRC20' ? wallet.trc20Address : wallet.bep20Address;
-  if (!address) return res.status(400).json({ message: `Please bind your ${type} address first.` });
+    // Step 2: Find user and check balance
+    const user = await User.findById(userId);
+    if (!user) return res.status(404).json({ message: 'User not found.' });
 
-  const withdrawal = await WithdrawalRequest.create({
-    userId,
-    walletType: type,
-    address,
-    amount,
-    password, // In production, hash it!
-  });
+    if (user.balance < amount) {
+      return res.status(400).json({ message: 'Insufficient balance.' });
+    }
 
-  res.status(201).json({ message: 'Withdrawal request submitted', withdrawal });
+    // Step 3: Check wallet bind
+    const wallet = await WalletBind.findOne({ userId });
+    if (!wallet) return res.status(400).json({ message: 'Please bind your wallet first.' });
+
+    const address = type === 'TRC20' ? wallet.trc20Address : wallet.bep20Address;
+    if (!address) return res.status(400).json({ message: `Please bind your ${type} address first.` });
+
+    // Step 4: Create withdrawal request
+    const withdrawal = await WithdrawalRequest.create({
+      userId,
+      walletType: type,
+      address,
+      amount,
+      password, // NOTE: For production, hash this password!
+    });
+
+    // Step 5: Deduct balance temporarily
+    user.balance -= amount;
+    await user.save();
+
+    res.status(201).json({ message: 'Withdrawal request submitted', withdrawal });
+
+  } catch (error) {
+    console.error('Withdrawal Error:', error);
+    res.status(500).json({ message: 'Internal server error.' });
+  }
 });
 
 router.get("/getwithdraw",async (req, res) => {
